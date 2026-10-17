@@ -289,6 +289,25 @@ export default function App() {
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
+  // Dynamic Laptop Server Connection State
+  const [serverUrl, setServerUrl] = useState<string>(() => {
+    return localStorage.getItem('zeroresidual_server_url') || import.meta.env.VITE_API_URL || '';
+  });
+  const [showServerModal, setShowServerModal] = useState<boolean>(false);
+  const [tempServerInput, setTempServerInput] = useState<string>(() => {
+    return localStorage.getItem('zeroresidual_server_url') || '';
+  });
+
+  const getApiUrl = (endpoint: string) => {
+    const base = serverUrl.replace(/\/+$/, '');
+    return base ? `${base}${endpoint}` : endpoint;
+  };
+
+  const getHeaders = (customHeaders: Record<string, string> = {}) => ({
+    'Bypass-Tunnel-Reminder': 'true',
+    ...customHeaders
+  });
+
   const t = UI_TEXT[language];
 
   // Upload & Audit handler
@@ -305,8 +324,9 @@ export default function App() {
       formData.append('file', file);
       formData.append('use_llm', 'true');
 
-      const res = await fetch('http://localhost:8000/api/upload-statement', {
+      const res = await fetch(getApiUrl('/api/upload-statement'), {
         method: 'POST',
+        headers: { 'Bypass-Tunnel-Reminder': 'true' },
         body: formData
       });
 
@@ -329,7 +349,7 @@ export default function App() {
     setIsUploading(true);
     setUploadError(null);
     try {
-      const res = await fetch(samplePath);
+      const res = await fetch(samplePath, { headers: { 'Bypass-Tunnel-Reminder': 'true' } });
       const blob = await res.blob();
       const file = new File([blob], fileName, { type: fileName.endsWith('.pdf') ? 'application/pdf' : 'text/csv' });
       setUploadedFile(file);
@@ -341,12 +361,16 @@ export default function App() {
   };
 
   // Check backend health
-  useEffect(() => {
-    fetch('http://localhost:8000/api/health')
+  const checkBackendHealth = () => {
+    fetch(getApiUrl('/api/health'), { headers: { 'Bypass-Tunnel-Reminder': 'true' } })
       .then(res => res.json())
       .then(d => setBackendHealth({ online: d.status === 'online', model: d.model, precision: d.precision }))
       .catch(() => setBackendHealth({ online: false, model: 'Offline', precision: 'Offline' }));
-  }, []);
+  };
+
+  useEffect(() => {
+    checkBackendHealth();
+  }, [serverUrl]);
 
   // Initialize Lenis smooth momentum scrolling
   useEffect(() => {
@@ -374,9 +398,9 @@ export default function App() {
   const loadReconciliation = async (scen: string) => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:8000/api/reconcile', {
+      const res = await fetch(getApiUrl('/api/reconcile'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ scenario: scen, use_llm: true })
       });
       if (res.ok) {
@@ -448,9 +472,9 @@ export default function App() {
   const handleTestNarration = async (text: string) => {
     setPlaygroundNarration(text);
     try {
-      const res = await fetch('http://localhost:8000/api/classify-narration', {
+      const res = await fetch(getApiUrl('/api/classify-narration'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ narration: text, use_llm: true })
       });
       if (res.ok) {
@@ -486,9 +510,9 @@ export default function App() {
     if (!data?.dispute_payload) return;
     setIsDispatching(true);
     try {
-      const res = await fetch('http://localhost:8000/api/dispute-action', {
+      const res = await fetch(getApiUrl('/api/dispute-action'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           dispute_id: data.dispute_payload.dispute_id,
           order_id: data.dispute_payload.target_order_id,
@@ -586,18 +610,19 @@ export default function App() {
               </button>
             </div>
 
-            {/* Backend & Offline Status */}
-            {backendHealth?.online ? (
-              <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-1 bg-[#dcfce7] text-[#166534] border border-[#166534]/20 rounded text-[10px] font-mono font-bold">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#166534] animate-pulse"></span>
-                Backend Live (8000)
-              </span>
-            ) : (
-              <span className="hidden sm:inline-flex items-center gap-1 px-2 py-1 bg-[#dcfce7] text-[#166534] border border-[#166534]/20 rounded text-[10px] font-mono font-bold">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#166534] animate-pulse"></span>
-                {t.offline_badge}
-              </span>
-            )}
+            {/* Backend & Edge Laptop Status (Clickable for connection config) */}
+            <button
+              onClick={() => {
+                setTempServerInput(serverUrl);
+                setShowServerModal(true);
+              }}
+              title="Click to configure Edge Laptop Server URL"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#dcfce7] hover:bg-[#bbf7d0] text-[#166534] border border-[#166534]/30 rounded text-[10px] font-mono font-bold cursor-pointer transition-colors shadow-2xs"
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${backendHealth?.online ? 'bg-[#166534] animate-pulse' : 'bg-[#e8501f]'}`}></span>
+              <span>{backendHealth?.online ? 'Laptop Server Live' : 'Connect Laptop Server'}</span>
+              <Smartphone className="w-3 h-3 text-[#166534]" />
+            </button>
 
           </div>
 
@@ -1517,6 +1542,97 @@ export default function App() {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          LAPTOP SERVER CONNECTION MODAL (For Remote/Mobile/Deployment)
+         ========================================================================= */}
+      {showServerModal && (
+        <div className="fixed inset-0 bg-[#141210]/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-[#fffdf8] border-2 border-[#141210] max-w-md w-full p-5 rounded-xl shadow-2xl relative">
+            <div className="flex justify-between items-start pb-3 border-b border-[#e0d8c8]">
+              <div>
+                <h3 className="font-serif text-lg font-bold text-[#141210]">
+                  💻 Edge Laptop Server Connection
+                </h3>
+                <p className="text-xs text-[#8b8472] mt-0.5">
+                  Point this deployed frontend to your laptop processing server
+                </p>
+              </div>
+              <button
+                onClick={() => setShowServerModal(false)}
+                className="text-[#8b8472] hover:text-[#141210] font-mono text-sm cursor-pointer p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              <div className="bg-[#faf4ec] p-3 rounded-lg border border-[#e0d8c8] text-xs font-mono">
+                <div className="flex items-center justify-between">
+                  <span className="text-[#8b8472]">Current Status:</span>
+                  <span className={`font-bold ${backendHealth?.online ? 'text-[#166534]' : 'text-[#e8501f]'}`}>
+                    {backendHealth?.online ? '✓ CONNECTED & ONLINE' : '⚠ OFFLINE / DISCONNECTED'}
+                  </span>
+                </div>
+                {backendHealth?.online && (
+                  <div className="text-[10px] text-[#514b3f] mt-1">
+                    Model: {backendHealth.model} · Precision: {backendHealth.precision}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-[#514b3f] mb-1 font-bold">
+                  Laptop Server URL (Tunnel / IP):
+                </label>
+                <input
+                  type="text"
+                  value={tempServerInput}
+                  onChange={(e) => setTempServerInput(e.target.value)}
+                  placeholder="e.g. https://long-wolves-guess.loca.lt or http://localhost:8000"
+                  className="w-full bg-white border border-[#d8cfbe] rounded px-3 py-2 text-xs font-mono text-[#141210] focus:outline-none focus:border-[#e8501f]"
+                />
+                <p className="text-[10px] text-[#8b8472] mt-1">
+                  Leave blank to use the default relative path (<code className="font-mono">/api</code>).
+                </p>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2 border-t border-[#e0d8c8]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTempServerInput('');
+                    setServerUrl('');
+                    localStorage.removeItem('zeroresidual_server_url');
+                    setShowServerModal(false);
+                    checkBackendHealth();
+                  }}
+                  className="px-3 py-1.5 text-xs font-mono text-[#8b8472] hover:text-[#141210] cursor-pointer"
+                >
+                  Reset Default
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const cleanUrl = tempServerInput.trim().replace(/\/+$/, '');
+                    setServerUrl(cleanUrl);
+                    if (cleanUrl) {
+                      localStorage.setItem('zeroresidual_server_url', cleanUrl);
+                    } else {
+                      localStorage.removeItem('zeroresidual_server_url');
+                    }
+                    setShowServerModal(false);
+                    checkBackendHealth();
+                  }}
+                  className="bg-[#141210] hover:bg-[#2c2824] text-white px-4 py-1.5 rounded text-xs font-mono font-bold cursor-pointer transition-all"
+                >
+                  Save & Connect
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
