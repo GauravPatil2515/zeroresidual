@@ -12,7 +12,12 @@ import {
   AlertCircle,
   CreditCard,
   Building,
-  RotateCcw
+  RotateCcw,
+  FileUp,
+  FileText,
+  ArrowUpRight,
+  ArrowDownRight,
+  ShieldCheck
 } from 'lucide-react';
 import { RegistrationMarks, FolioNumber } from './components/EditorialFurniture';
 
@@ -96,7 +101,28 @@ const UI_TEXT = {
     table_reason: "Type",
     table_customer: "Customer UPI",
     badge_soundbox: "Monthly Soundbox Rent",
-    badge_gst: "GST on Device Rent"
+    badge_gst: "GST on Device Rent",
+    tab_upload: "Statement Audit (PDF/CSV)",
+    upload_title: "Bank Statement / POS File Audit",
+    upload_sub: "Upload real PDF or CSV bank statements to dynamically parse every credit, debit, refund & fee down to the exact paisa",
+    upload_dropzone_main: "Drop your Bank Statement (PDF or CSV) here",
+    upload_dropzone_sub: "Supports HDFC, SBI, ICICI, Axis, Paytm & POS settlements",
+    upload_run_btn: "Run Dynamic Audit Now",
+    upload_sample_pdf_btn: "Sample HDFC Statement (PDF)",
+    upload_sample_csv_btn: "Sample Settlement Export (CSV)",
+    upload_analyzing: "Parsing statement & classifying line items...",
+    upload_result_title: "Parsed Statement Audit Breakdown",
+    upload_gross_in: "Total Credits (Deposit)",
+    upload_gross_out: "Total Deductions (Debits)",
+    upload_net_payout: "Net Settlement Balance",
+    upload_rows_count: "Entries Parsed",
+    upload_bank_detected: "Identified Bank",
+    upload_table_date: "Date",
+    upload_table_type: "Type",
+    upload_table_narration: "Bank Narration / Remark",
+    upload_table_category: "Classification",
+    upload_table_ref: "UTR / Reference",
+    upload_table_amount: "Amount"
   },
   HI: {
     brand_sub: "दैनिक हिसाब मुंशी",
@@ -146,7 +172,28 @@ const UI_TEXT = {
     table_reason: "प्रकार",
     table_customer: "ग्राहक UPI",
     badge_soundbox: "साउंडबॉक्स 4G किराया",
-    badge_gst: "किराए पर 18% GST"
+    badge_gst: "किराए पर 18% GST",
+    tab_upload: "बैंक स्टेटमेंट ऑडिट (PDF/CSV)",
+    upload_title: "बैंक स्टेटमेंट या POS फाइल का पक्का ऑडिट",
+    upload_sub: "HDFC, SBI, ICICI, Paytm की PDF व CSV फाइलों को अपलोड करें और पाई-पाई का असली हिसाब पाएं",
+    upload_dropzone_main: "बैंक स्टेटमेंट की PDF या CSV फाइल यहाँ खींचकर डालें",
+    upload_dropzone_sub: "HDFC, SBI, ICICI, Axis, Paytm व POS सेटलमेंट फाइलों का पूरा सपोर्ट",
+    upload_run_btn: "असली स्टेटमेंट का ऑडिट करें",
+    upload_sample_pdf_btn: "HDFC बैंक स्टेटमेंट का नमूना (PDF)",
+    upload_sample_csv_btn: "दैनिक सेटलमेंट का नमूना (CSV)",
+    upload_analyzing: "Gemma AI बैंक के हर एक लेन-देन का हिसाब निकाल रहा है...",
+    upload_result_title: "अपलोड की गई बैंक स्टेटमेंट का पक्का ऑडिट",
+    upload_gross_in: "खाते में कुल जमा (Credits)",
+    upload_gross_out: "कुल कटी हुई रकम (Debits)",
+    upload_net_payout: "नेट बैंक बैलेंस (Net Payout)",
+    upload_rows_count: "कुल लेन-देन",
+    upload_bank_detected: "पहचाना गया बैंक",
+    upload_table_date: "तारीख",
+    upload_table_type: "प्रकार",
+    upload_table_narration: "बैंक रिमार्क / विवरण",
+    upload_table_category: "पहचान (Category)",
+    upload_table_ref: "UTR / संदर्भ",
+    upload_table_amount: "रकम"
   },
   HINGLISH: {
     brand_sub: "Daily Settlement Assistant",
@@ -196,12 +243,33 @@ const UI_TEXT = {
     table_reason: "Type",
     table_customer: "Customer UPI",
     badge_soundbox: "Soundbox Monthly Rent",
-    badge_gst: "Rent Par 18% GST"
+    badge_gst: "Rent Par 18% GST",
+    tab_upload: "Statement Audit (PDF/CSV)",
+    upload_title: "Bank Statement / POS File Audit",
+    upload_sub: "Real PDF ya CSV bank statements upload karke har ek credit, debit, refund aur fee ka exact hisaab dekhein",
+    upload_dropzone_main: "Bank Statement ki PDF ya CSV yahan drop karein",
+    upload_dropzone_sub: "HDFC, SBI, ICICI, Axis, Paytm aur POS settlements supported",
+    upload_run_btn: "Real Audit Start Karein",
+    upload_sample_pdf_btn: "Sample HDFC Statement (PDF)",
+    upload_sample_csv_btn: "Sample Settlement Export (CSV)",
+    upload_analyzing: "Gemma AI bank ke entries ko classify kar raha hai...",
+    upload_result_title: "Uploaded Statement Ka Detailed Audit",
+    upload_gross_in: "Total Credits (Deposit)",
+    upload_gross_out: "Total Deductions (Clawbacks)",
+    upload_net_payout: "Net Settlement Balance",
+    upload_rows_count: "Parsed Entries",
+    upload_bank_detected: "Identified Bank",
+    upload_table_date: "Date",
+    upload_table_type: "Type",
+    upload_table_narration: "Bank Narration",
+    upload_table_category: "Category",
+    upload_table_ref: "UTR / Ref",
+    upload_table_amount: "Amount"
   }
 };
 
 export default function App() {
-  const [currentTab, setCurrentTab] = useState<'settlement' | 'deductions' | 'ai' | 'transactions'>('settlement');
+  const [currentTab, setCurrentTab] = useState<'settlement' | 'upload' | 'deductions' | 'ai' | 'transactions'>('settlement');
   const [scenario, setScenario] = useState<'scenario_1_tieout' | 'scenario_2_unexplained'>('scenario_1_tieout');
   const [language, setLanguage] = useState<'EN' | 'HI' | 'HINGLISH'>('HI');
   const [data, setData] = useState<ReconciliationResult | null>(null);
@@ -215,7 +283,62 @@ export default function App() {
   const [disputeDispatchResult, setDisputeDispatchResult] = useState<any | null>(null);
   const [isDispatching, setIsDispatching] = useState<boolean>(false);
 
+  // Upload Statement States
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [uploadAuditResult, setUploadAuditResult] = useState<any | null>(null);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
   const t = UI_TEXT[language];
+
+  // Upload & Audit handler
+  const handleUploadStatement = async (fileToUpload?: File) => {
+    const file = fileToUpload || uploadedFile;
+    if (!file) {
+      setUploadError(language === 'HI' ? "कृपया पहले बैंक स्टेटमेंट (PDF या CSV) चुनें।" : "Please select a CSV or PDF statement file first.");
+      return;
+    }
+    setUploadError(null);
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('use_llm', 'true');
+
+      const res = await fetch('http://localhost:8000/api/upload-statement', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.detail || `Upload failed with status ${res.status}`);
+      }
+
+      const json = await res.json();
+      setUploadAuditResult(json);
+      setUploadedFile(file);
+    } catch (err: any) {
+      setUploadError(err.message || "Failed to parse bank statement file.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleLoadSampleFile = async (samplePath: string, fileName: string) => {
+    setIsUploading(true);
+    setUploadError(null);
+    try {
+      const res = await fetch(samplePath);
+      const blob = await res.blob();
+      const file = new File([blob], fileName, { type: fileName.endsWith('.pdf') ? 'application/pdf' : 'text/csv' });
+      setUploadedFile(file);
+      await handleUploadStatement(file);
+    } catch (err: any) {
+      setUploadError("Failed to load sample statement: " + err.message);
+      setIsUploading(false);
+    }
+  };
 
   // Check backend health
   useEffect(() => {
@@ -527,6 +650,7 @@ export default function App() {
         <div className="max-w-6xl mx-auto flex items-center gap-2 sm:gap-6 overflow-x-auto text-xs font-mono py-2">
           {[
             { id: 'settlement', label: t.tab_settlement, icon: LayoutDashboard },
+            { id: 'upload', label: t.tab_upload, icon: FileUp, badge: 'PDF / CSV' },
             { id: 'deductions', label: t.tab_deductions, icon: RotateCcw, badge: '₹7,000' },
             { id: 'ai', label: t.tab_ai_assistant, icon: Sparkles, badge: 'Edge AI' },
             { id: 'transactions', label: t.tab_transactions, icon: Receipt, badge: '50' }
@@ -756,7 +880,313 @@ export default function App() {
         )}
 
         {/* =====================================================================
-            TAB 2: DEDUCTIONS (रुपये कहाँ कटे?)
+            TAB 2: UPLOAD & AUDIT STATEMENT (PDF / CSV)
+           ===================================================================== */}
+        {currentTab === 'upload' && (
+          <div className="space-y-6">
+            
+            {/* Header Card */}
+            <div className="bg-[#fffdf8] border border-[#e0d8c8] rounded-xl p-5 sm:p-6 shadow-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-[#e8501f] bg-[#fbe4d8] px-2 py-0.5 rounded font-bold">
+                  {language === 'HI' ? 'असली बैंक व POS स्टेटमेंट ऑडिट' : 'Dynamic Statement Engine · PDF / CSV'}
+                </span>
+                <span className="inline-flex items-center gap-1 text-[10px] font-mono text-[#166534] bg-[#eaf7ee] px-2 py-0.5 rounded border border-[#c3ebd0]">
+                  <ShieldCheck className="w-3 h-3" />
+                  {language === 'HI' ? '100% ऑन-डिवाइस प्राइवेसी' : '100% On-Device Financial Privacy'}
+                </span>
+              </div>
+              <h2 className="font-serif text-2xl sm:text-3xl font-bold text-[#141210] mt-2">
+                {t.upload_title}
+              </h2>
+              <p className="text-xs sm:text-sm text-[#514b3f] mt-1 leading-relaxed">
+                {t.upload_sub}
+              </p>
+            </div>
+
+            {/* Dropzone & File Selector Card */}
+            <div className="bg-[#fffdf8] border-2 border-dashed border-[#d8cfbe] hover:border-[#e8501f] transition-colors rounded-xl p-6 sm:p-8 text-center space-y-4">
+              <input
+                type="file"
+                id="statement-file-input"
+                accept=".pdf,.csv"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    setUploadedFile(e.target.files[0]);
+                    handleUploadStatement(e.target.files[0]);
+                  }
+                }}
+              />
+
+              <div 
+                className="cursor-pointer flex flex-col items-center justify-center space-y-3 py-4"
+                onClick={() => document.getElementById('statement-file-input')?.click()}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    setUploadedFile(e.dataTransfer.files[0]);
+                    handleUploadStatement(e.dataTransfer.files[0]);
+                  }
+                }}
+              >
+                <div className="w-14 h-14 rounded-full bg-[#fbe4d8] text-[#e8501f] flex items-center justify-center shadow-xs">
+                  <FileUp className="w-7 h-7" />
+                </div>
+                <div>
+                  <h3 className="font-serif text-base sm:text-lg font-bold text-[#141210]">
+                    {t.upload_dropzone_main}
+                  </h3>
+                  <p className="text-xs text-[#8b8472] mt-0.5">
+                    {t.upload_dropzone_sub}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="bg-[#141210] hover:bg-[#2c2824] text-white text-xs font-mono px-4 py-2 rounded-lg cursor-pointer transition-all shadow-xs"
+                >
+                  {language === 'HI' ? 'डिवाइस से फाइल चुनें (.pdf, .csv)' : 'Browse Device Files (.pdf, .csv)'}
+                </button>
+              </div>
+
+              {/* Selected File Details */}
+              {uploadedFile && (
+                <div className="bg-[#faf4ec] border border-[#e0d8c8] rounded-lg p-3 text-left flex items-center justify-between text-xs font-mono">
+                  <div className="flex items-center gap-2 truncate">
+                    <FileText className="w-4 h-4 text-[#e8501f] shrink-0" />
+                    <span className="font-bold text-[#141210] truncate">{uploadedFile.name}</span>
+                    <span className="text-[10px] text-[#8b8472]">({(uploadedFile.size / 1024).toFixed(1)} KB)</span>
+                  </div>
+                  <button
+                    onClick={() => handleUploadStatement()}
+                    disabled={isUploading}
+                    className="bg-[#e8501f] hover:bg-[#d04012] text-white px-3 py-1 rounded text-[11px] font-bold cursor-pointer disabled:opacity-50 shrink-0 ml-2"
+                  >
+                    {isUploading ? (language === 'HI' ? 'ऑडिट जारी...' : 'Auditing...') : t.upload_run_btn}
+                  </button>
+                </div>
+              )}
+
+              {/* 1-Click Test Buttons */}
+              <div className="pt-2 border-t border-[#e0d8c8]/60 flex flex-wrap items-center justify-center gap-2 text-xs">
+                <span className="text-[11px] font-mono text-[#8b8472]">
+                  {language === 'HI' ? 'या तुरंत 1-क्लिक में टेस्ट करें:' : 'Or test immediately with 1-click:'}
+                </span>
+                <button
+                  onClick={() => handleLoadSampleFile('/sample_hdfc_statement.pdf', 'sample_hdfc_statement.pdf')}
+                  disabled={isUploading}
+                  className="inline-flex items-center gap-1.5 bg-[#faf4ec] hover:bg-[#f2e9dc] border border-[#d8cfbe] px-3 py-1.5 rounded-md font-mono text-[11px] text-[#141210] cursor-pointer transition-all disabled:opacity-50"
+                >
+                  <FileText className="w-3.5 h-3.5 text-[#e8501f]" />
+                  <span>{t.upload_sample_pdf_btn}</span>
+                </button>
+                <button
+                  onClick={() => handleLoadSampleFile('/bank_settlement.csv', 'bank_settlement.csv')}
+                  disabled={isUploading}
+                  className="inline-flex items-center gap-1.5 bg-[#faf4ec] hover:bg-[#f2e9dc] border border-[#d8cfbe] px-3 py-1.5 rounded-md font-mono text-[11px] text-[#141210] cursor-pointer transition-all disabled:opacity-50"
+                >
+                  <Receipt className="w-3.5 h-3.5 text-[#166534]" />
+                  <span>{t.upload_sample_csv_btn}</span>
+                </button>
+              </div>
+
+              {/* Upload or Audit Error */}
+              {uploadError && (
+                <div className="bg-[#fef2f2] border border-[#fecaca] text-[#991b1b] p-3 rounded-lg text-xs flex items-center gap-2 text-left">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-[#dc2626]" />
+                  <span>{uploadError}</span>
+                </div>
+              )}
+
+              {/* Progress Loading Indicator */}
+              {isUploading && (
+                <div className="bg-[#fffdf8] border border-[#e0d8c8] p-4 rounded-lg flex items-center justify-center gap-3 text-xs font-mono text-[#e8501f]">
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>{t.upload_analyzing}</span>
+                </div>
+              )}
+            </div>
+
+            {/* REAL AUDIT RESULTS BREAKDOWN */}
+            {uploadAuditResult && (
+              <div className="space-y-6">
+                
+                {/* Result Status Banner */}
+                <div className="bg-[#f4fbf7] border-2 border-[#166534] rounded-xl p-4 sm:p-5 shadow-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-5 h-5 text-[#166534]" />
+                      <h3 className="font-serif font-bold text-lg text-[#166534]">
+                        {t.upload_result_title}
+                      </h3>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#166534] text-white font-bold">
+                        {uploadAuditResult.file_type} FORMAT
+                      </span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#eaf7ee] text-[#166534] border border-[#c3ebd0] font-bold">
+                        {uploadAuditResult.total_rows_processed} {t.upload_rows_count}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-2 text-xs text-[#2c2824] flex items-center gap-1 font-mono">
+                    <span className="font-bold text-[#141210]">{t.upload_bank_detected}:</span>
+                    <span className="text-[#e8501f] font-bold">{uploadAuditResult.bank_detected}</span>
+                  </div>
+
+                  <p className="mt-2 text-xs text-[#166534] bg-[#eaf7ee] p-2.5 rounded border border-[#c3ebd0]/60">
+                    {uploadAuditResult.audit_verdict}
+                  </p>
+                </div>
+
+                {/* 3 Large Financial Metrics */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                  {/* Credits */}
+                  <div className="bg-[#fffdf8] border border-[#e0d8c8] p-4 rounded-lg shadow-xs">
+                    <div className="text-[11px] font-mono text-[#8b8472] flex items-center gap-1">
+                      <ArrowDownRight className="w-3.5 h-3.5 text-[#166534]" />
+                      <span>{t.upload_gross_in}</span>
+                    </div>
+                    <div className="font-mono text-xl sm:text-2xl font-bold text-[#166534] mt-1">
+                      +₹{Number(uploadAuditResult.gross_credits).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </div>
+                    <div className="text-[10px] text-[#8b8472] mt-1">
+                      {language === 'HI' ? 'बैंक खाते में जमा' : 'Money credited to account'}
+                    </div>
+                  </div>
+
+                  {/* Deductions */}
+                  <div className="bg-[#fffdf8] border border-[#e0d8c8] p-4 rounded-lg shadow-xs">
+                    <div className="text-[11px] font-mono text-[#8b8472] flex items-center gap-1">
+                      <ArrowUpRight className="w-3.5 h-3.5 text-[#e8501f]" />
+                      <span>{t.upload_gross_out}</span>
+                    </div>
+                    <div className="font-mono text-xl sm:text-2xl font-bold text-[#e8501f] mt-1">
+                      -₹{Number(uploadAuditResult.total_debits).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </div>
+                    <div className="text-[10px] text-[#8b8472] mt-1">
+                      {language === 'HI' ? 'रिफंड, विवाद और किराया' : 'Refunds, disputes & fees deducted'}
+                    </div>
+                  </div>
+
+                  {/* Net Payout */}
+                  <div className="bg-[#fffdf8] border-2 border-[#141210] p-4 rounded-lg shadow-xs bg-[#faf4ec]">
+                    <div className="text-[11px] font-mono text-[#141210] flex items-center gap-1 font-bold">
+                      <Building className="w-3.5 h-3.5 text-[#141210]" />
+                      <span>{t.upload_net_payout}</span>
+                    </div>
+                    <div className="font-mono text-xl sm:text-2xl font-bold text-[#141210] mt-1">
+                      ₹{Number(uploadAuditResult.net_settlement_balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </div>
+                    <div className="text-[10px] text-[#8b8472] mt-1">
+                      {language === 'HI' ? 'अंतिम शुद्ध शेष' : 'Exact net settlement balance'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Categorized Breakdown Chips */}
+                {uploadAuditResult.categorized_breakdown && (
+                  <div className="bg-[#fffdf8] border border-[#e0d8c8] p-4 rounded-xl shadow-xs space-y-2">
+                    <span className="text-[11px] font-mono uppercase tracking-wider text-[#8b8472] font-bold">
+                      {language === 'HI' ? 'पहचाने गए मदों का विभाजन (Category Breakdown):' : 'Identified Category Breakdown:'}
+                    </span>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {Object.entries(uploadAuditResult.categorized_breakdown).map(([cat, amt]) => (
+                        <div
+                          key={cat}
+                          className="bg-[#faf4ec] border border-[#e0d8c8] rounded-md px-3 py-1 flex items-center gap-2 text-xs font-mono"
+                        >
+                          <span className="font-bold text-[#141210]">{cat}:</span>
+                          <span className={cat === 'SETTLED' ? 'text-[#166534] font-bold' : 'text-[#e8501f] font-bold'}>
+                            ₹{Number(amt).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Full Line-by-Line Itemized Table */}
+                <div className="bg-[#fffdf8] border border-[#e0d8c8] rounded-xl overflow-hidden shadow-xs">
+                  <div className="p-4 border-b border-[#e0d8c8] flex items-center justify-between">
+                    <div>
+                      <h4 className="font-serif font-bold text-base text-[#141210]">
+                        {language === 'HI' ? 'स्टेटमेंट की हर एक पंक्ति का विवरण' : 'Parsed Statement Itemized Ledger'}
+                      </h4>
+                      <p className="text-xs text-[#8b8472]">
+                        {language === 'HI' ? 'अपलोड की गई फाइल से निकाला गया वास्तविक डेटा:' : 'Actual parsed transactions extracted directly from file:'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs font-mono">
+                      <thead className="bg-[#faf4ec] border-b border-[#e0d8c8] text-[#8b8472] uppercase text-[10px]">
+                        <tr>
+                          <th className="py-2.5 px-3 text-left">{t.upload_table_date}</th>
+                          <th className="py-2.5 px-3 text-left">{t.upload_table_type}</th>
+                          <th className="py-2.5 px-3 text-left">{t.upload_table_narration}</th>
+                          <th className="py-2.5 px-3 text-left">{t.upload_table_category}</th>
+                          <th className="py-2.5 px-3 text-left">{t.upload_table_ref}</th>
+                          <th className="py-2.5 px-3 text-right">{t.upload_table_amount}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#ebe4d6]">
+                        {uploadAuditResult.itemized_records && uploadAuditResult.itemized_records.map((row: any, idx: number) => {
+                          const isCredit = row.type === 'CREDIT';
+                          return (
+                            <tr key={idx} className="hover:bg-[#faf4ec]/50 transition-colors">
+                              <td className="py-2.5 px-3 text-[#514b3f] whitespace-nowrap">{row.date}</td>
+                              <td className="py-2.5 px-3 whitespace-nowrap">
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                                  isCredit ? 'bg-[#eaf7ee] text-[#166534]' : 'bg-[#fbe4d8] text-[#e8501f]'
+                                }`}>
+                                  {row.type}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 text-[#141210] font-medium max-w-xs truncate" title={row.narration}>
+                                {row.narration}
+                              </td>
+                              <td className="py-2.5 px-3 whitespace-nowrap">
+                                <span className="bg-[#f0ebe1] text-[#2c2824] px-2 py-0.5 rounded text-[10px] font-bold">
+                                  {row.classified_category}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 text-[#8b8472] whitespace-nowrap">
+                                {row.ref_utr || '—'}
+                              </td>
+                              <td className={`py-2.5 px-3 text-right font-bold whitespace-nowrap ${
+                                isCredit ? 'text-[#166534]' : 'text-[#e8501f]'
+                              }`}>
+                                {isCredit ? '+' : '-'}₹{Number(row.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Audit Verdict Notes */}
+                <div className="bg-[#fffdf8] border border-[#e0d8c8] rounded-xl p-4 shadow-xs flex items-start gap-3">
+                  <ShieldCheck className="w-5 h-5 text-[#166534] shrink-0 mt-0.5" />
+                  <div className="text-xs text-[#514b3f] leading-relaxed">
+                    <span className="font-bold text-[#141210]">{language === 'HI' ? 'ऑडिट प्रमाण पत्र:' : 'Mathematical Verification Certificate:'} </span>
+                    {uploadAuditResult.audit_notes}
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+          </div>
+        )}
+
+        {/* =====================================================================
+            TAB 3: DEDUCTIONS (रुपये कहाँ कटे?)
            ===================================================================== */}
         {currentTab === 'deductions' && (
           <div className="space-y-6">
@@ -984,6 +1414,7 @@ export default function App() {
       <nav className="fixed bottom-0 inset-x-0 bg-[#fffdf8] border-t border-[#e0d8c8] px-2 py-1.5 flex items-center justify-around z-40 lg:hidden shadow-lg">
         {[
           { id: 'settlement', label: t.tab_settlement, icon: LayoutDashboard },
+          { id: 'upload', label: t.tab_upload, icon: FileUp },
           { id: 'deductions', label: t.tab_deductions, icon: RotateCcw },
           { id: 'ai', label: t.tab_ai_assistant, icon: Sparkles },
           { id: 'transactions', label: t.tab_transactions, icon: Receipt }

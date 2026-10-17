@@ -104,3 +104,18 @@ def mock_dispute_action(req: DisputeActionRequest):
         "submitted_at": "2026-10-17T14:45:00+05:30",
         "message": f"Dispute defense registered with Paytm Payments Services. Evidence attached: '{req.evidence_note}'. Funds held in escrow will be released upon bank verification."
     }
+
+from fastapi import UploadFile, File, Form
+from zeroresidual.engine.parsers import UniversalStatementParser
+
+universal_parser = UniversalStatementParser(classifier)
+
+@app.post("/api/upload-statement")
+async def upload_and_audit(file: UploadFile = File(...), use_llm: bool = Form(True)):
+    try:
+        content = await file.read()
+        res = universal_parser.audit_statement(file.filename or "statement.csv", content, use_llm=use_llm)
+        return res.model_dump()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to parse uploaded statement: {str(e)}")
+
