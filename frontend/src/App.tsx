@@ -698,9 +698,9 @@ export default function App() {
       </div>
 
       {/* =========================================================================
-          NAVIGATION TABS (Clear & Merchant Friendly)
+          NAVIGATION TABS (Desktop Only - Hidden on Mobile App View to Prevent Duplication)
          ========================================================================= */}
-      <div className="bg-[#fffdf8] border-b border-[#e0d8c8] px-4">
+      <div className="hidden lg:block bg-[#fffdf8] border-b border-[#e0d8c8] px-4">
         <div className="max-w-6xl mx-auto flex items-center gap-2 sm:gap-6 overflow-x-auto text-xs font-mono py-2">
           {[
             { id: 'settlement', label: t.tab_settlement, icon: LayoutDashboard },
