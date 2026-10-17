@@ -6,48 +6,49 @@ from typing import Optional, Dict, Any
 
 class GemmaClient:
     """
-    Unified Gemma 2 Client:
+    Unified Google AI / Gemma Client:
     Supports:
-    1. OpenRouter Cloud API (google/gemma-2-9b-it:free or google/gemma-2-9b-it)
-    2. Groq Cloud API (gemma2-9b-it)
-    3. Local Ollama (gemma2:2b on localhost:11434)
+    1. Google AI Studio API (Gemini 2.5 Flash / Gemma 4 / Flash Lite) via GEMINI_API_KEY or GOOGLE_API_KEY
+    2. OpenRouter Cloud API (google/gemma-3-4b-it / google/gemma-2-27b-it)
+    3. Groq Cloud API (gemma2-9b-it)
+    4. Local Ollama (gemma2:2b on localhost:11434)
     """
     def __init__(
         self,
-        model_name: str = "google/gemma-2-9b-it:free",
+        model_name: str = "gemini-2.5-flash",
         host: str = "http://localhost:11434",
         api_key: Optional[str] = None,
         timeout_sec: float = 6.0
     ):
         self.host = host
-        self.api_key = api_key or os.getenv("OPENROUTER_API_KEY") or os.getenv("GROQ_API_KEY")
+        self.api_key = api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or os.getenv("OPENROUTER_API_KEY") or os.getenv("GROQ_API_KEY")
         self.timeout_sec = timeout_sec
+        self._detect_provider(model_name)
 
-        # Determine backend provider
-        if os.getenv("GROQ_API_KEY"):
-            self.provider = "GROQ"
-            self.model_name = "gemma2-9b-it"
+    def _detect_provider(self, default_model: str = "gemini-2.5-flash"):
+        if self.api_key and (self.api_key.startswith("AQ.") or self.api_key.startswith("AIza")):
+            self.provider = "GOOGLE_AI_STUDIO"
+            self.model_name = "gemini-2.5-flash"
         elif self.api_key and self.api_key.startswith("sk-or-"):
             self.provider = "OPENROUTER"
-            self.model_name = model_name
+            self.model_name = "google/gemma-3-4b-it"
+        elif self.api_key and self.api_key.startswith("gsk_"):
+            self.provider = "GROQ"
+            self.model_name = "gemma2-9b-it"
         elif self.api_key:
-            self.provider = "OPENROUTER"
-            self.model_name = model_name
+            # Default to Google AI Studio if typical Google key format
+            self.provider = "GOOGLE_AI_STUDIO"
+            self.model_name = "gemini-2.5-flash"
         else:
             self.provider = "OLLAMA"
             self.model_name = "gemma2:2b"
 
     def set_api_key(self, key: str):
         self.api_key = key.strip()
-        if self.api_key.startswith("gsk_"):
-            self.provider = "GROQ"
-            self.model_name = "gemma2-9b-it"
-        else:
-            self.provider = "OPENROUTER"
-            self.model_name = "google/gemma-3-4b-it"
+        self._detect_provider()
 
     def is_available(self) -> bool:
-        if self.provider in ("OPENROUTER", "GROQ") and self.api_key:
+        if self.provider in ("GOOGLE_AI_STUDIO", "OPENROUTER", "GROQ") and self.api_key:
             return True
         try:
             res = requests.get(f"{self.host}/api/tags", timeout=0.5)
@@ -55,12 +56,39 @@ class GemmaClient:
         except Exception:
             return False
 
+    def _call_gemini(self, prompt: str, format_json: bool = False, max_tokens: int = 800) -> Optional[str]:
+        if not self.api_key:
+            return None
+        models_to_try = ["gemini-2.5-flash", "gemini-flash-latest", "gemma-4-26b-a4b-it"]
+        for model in models_to_try:
+            try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.api_key}"
+                body: Dict[str, Any] = {
+                    "contents": [{"parts": [{"text": prompt}]}],
+                    "generationConfig": {
+                        "temperature": 0.0 if format_json else 0.2,
+                        "maxOutputTokens": max(max_tokens, 800)
+                    }
+                }
+                if format_json:
+                    body["generationConfig"]["responseMimeType"] = "application/json"
+
+                res = requests.post(url, json=body, timeout=self.timeout_sec)
+                if res.status_code == 200:
+                    data = res.json()
+                    candidates = data.get("candidates", [])
+                    if candidates:
+                        parts = candidates[0].get("content", {}).get("parts", [])
+                        if parts:
+                            return parts[0].get("text", "").strip()
+            except Exception:
+                continue
+        return None
+
     def _call_openrouter(self, prompt: str, format_json: bool = False, max_tokens: int = 150) -> Optional[str]:
         if not self.api_key:
             return None
-        
-        # Use available OpenRouter Gemma models with automatic fallbacks
-        models_to_try = [self.model_name, "google/gemma-2-27b-it", "google/gemma-3-12b-it", "google/gemma-4-26b-a4b-it:free"]
+        models_to_try = [self.model_name, "google/gemma-3-4b-it", "google/gemma-2-27b-it", "google/gemma-4-26b-a4b-it:free"]
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
@@ -72,9 +100,7 @@ class GemmaClient:
             try:
                 body: Dict[str, Any] = {
                     "model": model,
-                    "messages": [
-                        {"role": "user", "content": prompt}
-                    ],
+                    "messages": [{"role": "user", "content": prompt}],
                     "temperature": 0.0 if format_json else 0.2,
                     "max_tokens": max_tokens
                 }
@@ -150,7 +176,11 @@ class GemmaClient:
         return None
 
     def _raw_generate(self, prompt: str, format_json: bool = False, max_tokens: int = 150) -> Optional[str]:
-        if self.provider == "OPENROUTER":
+        if self.provider == "GOOGLE_AI_STUDIO":
+            out = self._call_gemini(prompt, format_json, max_tokens)
+            if out:
+                return out
+        elif self.provider == "OPENROUTER":
             out = self._call_openrouter(prompt, format_json, max_tokens)
             if out:
                 return out
@@ -173,7 +203,6 @@ class GemmaClient:
         try:
             return json.loads(cleaned)
         except Exception:
-            # Fallback regex search for JSON inside string
             match = re.search(r'(\{.*\})', cleaned, re.DOTALL)
             if match:
                 try:
