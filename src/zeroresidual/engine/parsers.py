@@ -82,7 +82,8 @@ class UniversalStatementParser:
 
                 # Determine Debit vs Credit based on keywords or column positioning
                 upper_line = line.upper()
-                if "CMS/" in upper_line or "SETTL" in upper_line or "DEPOSIT" in upper_line or "CREDIT" in upper_line:
+                is_debit = any(k in upper_line for k in ["HOLD", "REFUND", "CHBK", "RENT", "FEE", "GST", "ADJ", "REV", "DR"])
+                if not is_debit and ("CMS/" in upper_line or "SETTL" in upper_line or "DEPOSIT" in upper_line or "CREDIT" in upper_line or "CR" in upper_line):
                     deposit = dec_amounts[0]
                     if len(dec_amounts) > 1:
                         balance = dec_amounts[-1]
