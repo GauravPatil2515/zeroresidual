@@ -76,6 +76,19 @@ zeroresidual demo-tieout --no-llm --json
 
 ZeroResidual includes a Poster Doctrine editorial dashboard built with React, Vite, and Tailwind CSS.
 
+### Key Capabilities
+* **Interactive Settlement Waterfall:** Real-time visual accounting ledger with exact paisa breakdown.
+* **Universal Multi-Page Statement Importer:** Drag-and-drop 3-page HDFC/SBI/Paytm bank PDFs and CSVs. Automatically parses all pages, normalizes dates, extracts UTRs, and itemizes deductions.
+* **Gemma AI Munshi Chatbot:** Multilingual financial advisor in Hindi, Hinglish, and English running Gemma 2 (2B) on-device (Edge/POS) or via Cloud API. Explains fees, disputes, and deductions directly from active statement data.
+* **Dispute Defense Workbench:** One-click evidence submission and escrow claim defense with auto-filled payloads.
+* **Gemma 2 Narration Tester:** Real-time semantic narration classification using local Google Gemma 2 (2B).
+
+### Sample Multi-Page Merchant Statement
+Download or inspect the included 3-page realistic HDFC Bank merchant statement:
+* **PDF Statement (3 Pages):** [`frontend/public/sample_merchant_hdfc_statement.pdf`](frontend/public/sample_merchant_hdfc_statement.pdf)
+* **CSV Statement (24 Rows):** [`frontend/public/sample_merchant_statement.csv`](frontend/public/sample_merchant_statement.csv)
+* **Statement Stats:** 24 transactions across 5 days, ₹3,00,000.00 gross credits, ₹19,137.20 deductions, ₹280,862.80 net payout.
+
 ### Starting the Servers
 ```bash
 # Start FastAPI backend (port 8000)
@@ -86,11 +99,6 @@ cd frontend
 npm install
 npm run dev
 ```
-
-Visit `http://localhost:5173` to explore:
-* **Interactive Settlement Waterfall:** Real-time visual accounting ledger.
-* **Dispute Defense Workbench:** One-click evidence submission and escrow claim defense.
-* **Gemma 2 Narration Tester:** Test arbitrary bank strings against local Google Gemma 2 (2B).
 
 ---
 
