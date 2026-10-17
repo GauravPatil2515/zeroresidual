@@ -23,3 +23,8 @@ dependencies = [
 
 [project.scripts]
 zeroresidual = "zeroresidual.cli:app"
+
+[tool.pytest.ini_options]
+addopts = "-p no:asyncio"
+testpaths = ["tests"]
+
