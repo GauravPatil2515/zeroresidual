@@ -612,13 +612,14 @@ export default function App() {
           { category: "UNEXPLAINED", label: "Residual Difference", amount: isTieout ? "0.00" : "212.00", count: isTieout ? 0 : 1, direction: "RESIDUAL", notes: isTieout ? "Ek-ek rupaye ka hisaab barabar" : "Bank ne ₹212 kam transfer kiye hain" }
         ],
         ledger_records: [
-          { order_id: "ORD-1011", amount: "1400.00", timestamp: "17 Oct, 11:30 AM", status: "REFUNDED", category: "REFUND", customer_vpa: "rohit.sharma@okhdfcbank" },
-          { order_id: "ORD-1025", amount: "1000.00", timestamp: "17 Oct, 12:45 PM", status: "REFUNDED", category: "REFUND", customer_vpa: "priya.nair@oksbi" },
-          { order_id: "ORD-1008", amount: "3100.00", timestamp: "17 Oct, 10:15 AM", status: "ON_HOLD", category: "CHARGEBACK_HOLD", customer_vpa: "vikram.patel@icici" },
-          { order_id: "ORD-1048", amount: "300.00", timestamp: "17 Oct, 11:14 PM", status: "T+1 DELAY", category: "CUTOFF_DELAY", customer_vpa: "ananya.sen@paytm" },
-          { order_id: "ORD-1049", amount: "450.00", timestamp: "17 Oct, 11:28 PM", status: "T+1 DELAY", category: "CUTOFF_DELAY", customer_vpa: "karthik.r@axisbank" },
-          { order_id: "ORD-1050", amount: "250.00", timestamp: "17 Oct, 11:45 PM", status: "T+1 DELAY", category: "CUTOFF_DELAY", customer_vpa: "dev.gupta@okicici" },
-          { order_id: "ORD-1051", amount: "212.00", timestamp: "17 Oct, 10:11 PM", status: "MISSING", category: "UNEXPLAINED", customer_vpa: "alok.verma@paytm" }
+          { order_id: "PAYTM88912001928", amount: isTieout ? "43000.00" : "42788.00", timestamp: "17-10-2026", status: "SETTLED", category: "SETTLED", customer_vpa: "NEFT-PAYTM-SETTL-OCT17-MID7721-UTR88912" },
+          { order_id: "ORD-1011", amount: "1400.00", timestamp: "17-10-2026", status: "DEDUCTION", category: "REFUND", customer_vpa: "UPI/CR/99210/PAYTM_REFUND_ADJ/ORD-1011/HDFC" },
+          { order_id: "ORD-1025", amount: "1000.00", timestamp: "17-10-2026", status: "DEDUCTION", category: "REFUND", customer_vpa: "REV-UPI-REFUND-PAYTM-ORD-1025-SBI" },
+          { order_id: "ORD-1008", amount: "3100.00", timestamp: "17-10-2026", status: "DEDUCTION", category: "CHARGEBACK_HOLD", customer_vpa: "CHBK-HOLD-DISP-992-ORD-1008-ICICI-ESCROW" },
+          { order_id: "PAYTM-RENT", amount: "423.73", timestamp: "17-10-2026", status: "DEDUCTION", category: "SOUNDBOX_FEE", customer_vpa: "PAYTM-SNDBOX-RENTAL-OCT26-DEVICE-SN7719" },
+          { order_id: "PAYTM-GST", amount: "76.27", timestamp: "17-10-2026", status: "DEDUCTION", category: "SOUNDBOX_GST", customer_vpa: "GST@18%-ON-PAYTM-SOUNDBOX-CHARGES-HSN9983" },
+          { order_id: "HOLD-T+1-NIGHT", amount: "1000.00", timestamp: "17-10-2026", status: "T+1 DELAY", category: "CUTOFF_DELAY", customer_vpa: "HOLD-T+1-NIGHT-SETTLEMENT-AFTER-2300" },
+          ...(!isTieout ? [{ order_id: "DISCREPANCY-212", amount: "212.00", timestamp: "17-10-2026", status: "MISSING", category: "UNEXPLAINED", customer_vpa: "Bank Shortfall: Missing settlement funds without deduction note" }] : [])
         ],
         narration_audits: [],
         explanation_en: isTieout 

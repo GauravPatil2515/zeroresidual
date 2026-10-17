@@ -259,24 +259,45 @@ class ReconciliationEngine:
                 "api_endpoint": "MOCK_PAYTM_DISPUTE_API: POST /v1/dispute/action"
             }
 
-        # Build Ledger Record Table for frontend
+        # Build Ledger Record Table for frontend directly from verified statement & bank transactions
         ledger_records = []
-        for order in pos_orders:
-            category = "SETTLED"
-            if order.order_id in refund_orders:
-                category = "REFUND"
-            elif order.order_id in chargeback_orders:
-                category = "CHARGEBACK_HOLD"
-            elif order.order_id in cutoff_orders:
-                category = "CUTOFF_DELAY"
+        for b in bank_records:
+            if b.txn_type == "CR":
+                cat_val = DeductionCategory.SETTLED.value
+                stat_val = "SETTLED"
+            else:
+                cat, _, _ = self.classifier.classify(b.narration, use_llm=use_llm)
+                cat_val = cat.value
+                stat_val = "DEDUCTION"
 
             ledger_records.append({
-                "order_id": order.order_id,
-                "amount": str(order.amount),
-                "timestamp": order.timestamp,
-                "status": order.status,
-                "category": category,
-                "customer_vpa": order.customer_vpa or "N/A"
+                "order_id": b.utr_number or b.bank_ref_no,
+                "amount": str(b.amount),
+                "timestamp": b.timestamp,
+                "status": stat_val,
+                "category": cat_val,
+                "customer_vpa": b.narration
+            })
+
+        # Include Cutoff and Residual if present
+        if cutoff_total > Decimal("0.00"):
+            ledger_records.append({
+                "order_id": "HOLD-T+1-NIGHT-SETTLEMENT",
+                "amount": str(cutoff_total),
+                "timestamp": "2026-10-17 23:15:00",
+                "status": "T+1 DELAY",
+                "category": DeductionCategory.CUTOFF_DELAY.value,
+                "customer_vpa": "Transactions past 23:00 IST deferred to next morning settlement"
+            })
+
+        if not is_reconciled and abs(residual) > Decimal("0.00"):
+            ledger_records.append({
+                "order_id": "DISCREPANCY-212",
+                "amount": str(abs(residual)),
+                "timestamp": "2026-10-17 23:59:00",
+                "status": "MISSING",
+                "category": DeductionCategory.UNEXPLAINED.value,
+                "customer_vpa": f"Bank Shortfall: Unexplained missing funds (₹{abs(residual):.2f}) without verified deduction note"
             })
 
         return ReconciliationResult(
