@@ -730,7 +730,7 @@ export default function App() {
     );
   }
 
-  const isShortfall = !data.is_reconciled && Number(data.residual) > 0;
+  const isShortfall = !data.is_reconciled && Math.abs(Number(data.residual)) > 0;
 
   return (
     <div className="min-h-screen bg-[#f5ece5] text-[#141210] flex flex-col antialiased pb-20 lg:pb-10">
@@ -978,12 +978,12 @@ export default function App() {
                 <div className={`font-mono text-xl sm:text-2xl font-bold mt-1 ${
                   data.is_reconciled ? 'text-[#166534]' : 'text-[#991b1b]'
                 }`}>
-                  {data.is_reconciled ? '₹0.00' : `- ₹${Number(data.residual).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
+                  {data.is_reconciled ? '₹0.00' : `- ₹${Math.abs(Number(data.residual)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
                 </div>
                 <div className="text-[10px] mt-1 font-bold">
                   {data.is_reconciled 
                     ? t.matched_status 
-                    : `⚠️ ₹${Number(data.residual).toLocaleString('en-IN', { minimumFractionDigits: 2 })} ${language === 'HI' ? 'बैंक से कम आए!' : 'Missing from Bank!'}`}
+                    : `⚠️ ₹${Math.abs(Number(data.residual)).toLocaleString('en-IN', { minimumFractionDigits: 2 })} ${language === 'HI' ? 'बैंक से कम आए!' : 'Missing from Bank!'}`}
                 </div>
               </div>
 
@@ -996,8 +996,8 @@ export default function App() {
                 <div className="text-xs">
                   <div className="font-bold text-[#991b1b] text-sm">
                     {language === 'HI' 
-                      ? `सावधान: बैंक ने ₹${Number(data.residual).toLocaleString('en-IN', { minimumFractionDigits: 2 })} कम जमा किए हैं!` 
-                      : `ALERT: ₹${Number(data.residual).toLocaleString('en-IN', { minimumFractionDigits: 2 })} Missing from Bank Deposit!`}
+                      ? `सावधान: बैंक ने ₹${Math.abs(Number(data.residual)).toLocaleString('en-IN', { minimumFractionDigits: 2 })} कम जमा किए हैं!` 
+                      : `ALERT: ₹${Math.abs(Number(data.residual)).toLocaleString('en-IN', { minimumFractionDigits: 2 })} Missing from Bank Deposit!`}
                   </div>
                   <p className="text-[#514b3f] mt-1">
                     {language === 'HI'
