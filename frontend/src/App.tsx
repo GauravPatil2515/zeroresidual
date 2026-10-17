@@ -417,16 +417,16 @@ export default function App() {
 
   const handleSyncUploadedStatement = (audit: any) => {
     if (!audit) return;
-    const grossCredits = String(audit.gross_credits || "43000.00");
-    const totalDebits = String(audit.total_debits || "6000.00");
-    const netPayout = String(audit.net_settlement_balance || "37000.00");
+    const grossCredits = audit.gross_credits !== undefined && audit.gross_credits !== null ? String(audit.gross_credits) : "0.00";
+    const totalDebits = audit.total_debits !== undefined && audit.total_debits !== null ? String(audit.total_debits) : "0.00";
+    const netPayout = audit.net_settlement_balance !== undefined && audit.net_settlement_balance !== null ? String(audit.net_settlement_balance) : "0.00";
 
     const steps: WaterfallStep[] = [
       {
         category: "SETTLED",
         label: `${audit.bank_detected || 'Bank'} Gross Credits`,
         amount: grossCredits,
-        count: audit.total_rows_processed || 6,
+        count: audit.total_rows_processed !== undefined ? audit.total_rows_processed : 0,
         direction: "BASE",
         notes: `Total money processed from ${audit.file_name}`
       }
@@ -730,7 +730,7 @@ export default function App() {
     );
   }
 
-  const isShortfall = scenario === 'scenario_2_unexplained';
+  const isShortfall = !data.is_reconciled && Number(data.residual) > 0;
 
   return (
     <div className="min-h-screen bg-[#f5ece5] text-[#141210] flex flex-col antialiased pb-20 lg:pb-10">
@@ -978,37 +978,43 @@ export default function App() {
                 <div className={`font-mono text-xl sm:text-2xl font-bold mt-1 ${
                   data.is_reconciled ? 'text-[#166534]' : 'text-[#991b1b]'
                 }`}>
-                  {data.is_reconciled ? '₹0.00' : '- ₹212.00'}
+                  {data.is_reconciled ? '₹0.00' : `- ₹${Number(data.residual).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
                 </div>
                 <div className="text-[10px] mt-1 font-bold">
-                  {data.is_reconciled ? t.matched_status : t.shortfall_status}
+                  {data.is_reconciled 
+                    ? t.matched_status 
+                    : `⚠️ ₹${Number(data.residual).toLocaleString('en-IN', { minimumFractionDigits: 2 })} ${language === 'HI' ? 'बैंक से कम आए!' : 'Missing from Bank!'}`}
                 </div>
               </div>
 
             </div>
 
-            {/* ALERT BOX if ₹212 missing */}
+            {/* ALERT BOX if money missing */}
             {isShortfall && (
               <div className="p-4 bg-[#fee2e2] border-2 border-[#991b1b] rounded-lg flex items-start gap-3">
                 <AlertCircle className="w-5 h-5 text-[#991b1b] shrink-0 mt-0.5" />
                 <div className="text-xs">
                   <div className="font-bold text-[#991b1b] text-sm">
-                    {language === 'HI' ? 'सावधान: बैंक ने ₹212 कम जमा किए हैं!' : 'ALERT: ₹212.00 Missing from Bank Deposit!'}
+                    {language === 'HI' 
+                      ? `सावधान: बैंक ने ₹${Number(data.residual).toLocaleString('en-IN', { minimumFractionDigits: 2 })} कम जमा किए हैं!` 
+                      : `ALERT: ₹${Number(data.residual).toLocaleString('en-IN', { minimumFractionDigits: 2 })} Missing from Bank Deposit!`}
                   </div>
                   <p className="text-[#514b3f] mt-1">
                     {language === 'HI'
-                      ? 'आपकी दुकान की ₹50,000 की बिक्री पर ₹43,000 आने चाहिए थे, पर बैंक ने ₹42,788 ही भेजे। ZeroResidual बिना पक्के प्रमाण के कोई अंदाज़ा नहीं लगाता। नीचे दिए बटन से बैंक को तुरंत शिकायत भेजें।'
-                      : 'Expected payout was ₹43,000, but only ₹42,788 reached the bank. ZeroResidual refuses to invent fake fees. Use 1-click dispute below to recover.'}
+                      ? `आपकी दुकान की ₹${Number(data.gross_pos_sales).toLocaleString('en-IN')} की बिक्री पर ₹${Number(data.expected_payout).toLocaleString('en-IN')} आने चाहिए थे, पर बैंक ने ₹${Number(data.bank_received_payout).toLocaleString('en-IN')} ही भेजे। ZeroResidual बिना पक्के प्रमाण के कोई अंदाज़ा नहीं लगाता।`
+                      : `Expected payout was ₹${Number(data.expected_payout).toLocaleString('en-IN')}, but only ₹${Number(data.bank_received_payout).toLocaleString('en-IN')} reached the bank. ZeroResidual strictly accounts down to the exact paisa.`}
                   </p>
                 </div>
               </div>
             )}
 
-            {/* Simple Visual Breakdown: Where did ₹7,000 go? */}
+            {/* Simple Visual Breakdown: Where did deductions go? */}
             <div className="bg-[#fffdf8] border border-[#e0d8c8] rounded-xl p-5 sm:p-6 shadow-xs space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-[#ebe4d6]">
                 <h3 className="font-serif font-bold text-lg text-[#141210]">
-                  {t.why_deducted}
+                  {language === 'HI' 
+                    ? `₹${Number(data.total_deductions).toLocaleString('en-IN', { minimumFractionDigits: 2 })} क्यों कटे? आसान ब्रेकडाउन:` 
+                    : `Why was ₹${Number(data.total_deductions).toLocaleString('en-IN', { minimumFractionDigits: 2 })} deducted? Breakdown:`}
                 </h3>
                 <span className="text-[11px] font-mono text-[#166534] bg-[#dcfce7] px-2 py-0.5 rounded font-bold">
                   {t.verified_numbers}
@@ -1016,75 +1022,47 @@ export default function App() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                
-                {/* 1. Refunds */}
-                <div className="p-3.5 bg-[#faf4ec] rounded-lg border border-[#e0d8c8] flex items-center justify-between">
-                  <div>
-                    <div className="font-bold text-xs text-[#141210] flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-[#e8501f]"></span>
-                      <span>1. Customer Refunds (रिफंड)</span>
+                {data.waterfall
+                  .filter(step => step.direction === 'SUBTRACT')
+                  .map((step, idx) => (
+                    <div key={idx} className="p-3.5 bg-[#faf4ec] rounded-lg border border-[#e0d8c8] flex items-center justify-between">
+                      <div>
+                        <div className="font-bold text-xs text-[#141210] flex items-center gap-1.5">
+                          <span className={`w-2 h-2 rounded-full ${
+                            step.category === 'REFUND' ? 'bg-[#e8501f]' :
+                            step.category === 'CHARGEBACK_HOLD' ? 'bg-[#a9712a]' :
+                            step.category === 'CUTOFF_DELAY' ? 'bg-[#514b3f]' :
+                            'bg-[#8b8472]'
+                          }`}></span>
+                          <span>{step.label}</span>
+                        </div>
+                        <div className="text-[11px] text-[#8b8472] mt-0.5">{step.notes}</div>
+                        {step.count > 0 && (
+                          <div className="text-[10px] font-mono text-[#a9712a] mt-0.5">
+                            {step.count} {step.count === 1 ? 'entry' : 'entries'}
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-right font-mono font-bold text-xs text-[#e8501f] ml-3 shrink-0">
+                        - ₹{Number(step.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </div>
                     </div>
-                    <div className="text-[11px] text-[#8b8472] mt-0.5">2 ग्राहकों के पैसे वापस किए गए</div>
-                  </div>
-                  <div className="text-right font-mono font-bold text-xs text-[#e8501f]">
-                    - ₹2,400.00
-                  </div>
-                </div>
-
-                {/* 2. Customer Dispute Hold */}
-                <div className="p-3.5 bg-[#faf4ec] rounded-lg border border-[#e0d8c8] flex items-center justify-between">
-                  <div>
-                    <div className="font-bold text-xs text-[#141210] flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-[#a9712a]"></span>
-                      <span>2. Dispute Hold (ग्राहक शिकायत)</span>
-                    </div>
-                    <div className="text-[11px] text-[#8b8472] mt-0.5">बैंक ने ₹3,100 रोक रखे हैं (ORD-1008)</div>
-                  </div>
-                  <div className="text-right font-mono font-bold text-xs text-[#e8501f]">
-                    - ₹3,100.00
-                  </div>
-                </div>
-
-                {/* 3. Night Orders */}
-                <div className="p-3.5 bg-[#faf4ec] rounded-lg border border-[#e0d8c8] flex items-center justify-between">
-                  <div>
-                    <div className="font-bold text-xs text-[#141210] flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-[#514b3f]"></span>
-                      <span>3. Night Orders (रात 11 बजे के बाद)</span>
-                    </div>
-                    <div className="text-[11px] text-[#8b8472] mt-0.5">3 ऑर्डर्स कल सुबह के खाते में आएंगे</div>
-                  </div>
-                  <div className="text-right font-mono font-bold text-xs text-[#e8501f]">
-                    - ₹1,000.00
-                  </div>
-                </div>
-
-                {/* 4. Soundbox Rent */}
-                <div className="p-3.5 bg-[#faf4ec] rounded-lg border border-[#e0d8c8] flex items-center justify-between">
-                  <div>
-                    <div className="font-bold text-xs text-[#141210] flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-[#8b8472]"></span>
-                      <span>4. Soundbox Rent + 18% GST</span>
-                    </div>
-                    <div className="text-[11px] text-[#8b8472] mt-0.5">₹423.73 किराया + ₹76.27 सरकारी GST</div>
-                  </div>
-                  <div className="text-right font-mono font-bold text-xs text-[#e8501f]">
-                    - ₹500.00
-                  </div>
-                </div>
-
+                  ))}
               </div>
 
               {/* Action button to recover dispute */}
-              <div className="pt-2">
-                <button
-                  onClick={() => setShowDisputeModal(true)}
-                  className="w-full sm:w-auto px-5 py-2.5 bg-[#e8501f] hover:bg-[#c2410c] text-white rounded-lg text-xs font-mono font-bold shadow flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <Send className="w-4 h-4" />
-                  <span>{t.defend_btn}</span>
-                </button>
-              </div>
+              {data.dispute_payload && (
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowDisputeModal(true)}
+                    className="w-full sm:w-auto px-5 py-2.5 bg-[#e8501f] hover:bg-[#c2410c] text-white rounded-lg text-xs font-mono font-bold shadow flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Send className="w-4 h-4" />
+                    <span>{t.defend_btn}</span>
+                  </button>
+                </div>
+              )}
 
             </div>
 
@@ -1849,7 +1827,7 @@ export default function App() {
                   <tbody className="divide-y divide-[#ebe4d6]">
                     {data.ledger_records
                       .filter(r => activeFilter === 'ALL' || r.category === activeFilter)
-                      .filter(r => !searchQuery || r.order_id.toLowerCase().includes(searchQuery.toLowerCase()) || r.customer_vpa.toLowerCase().includes(searchQuery.toLowerCase()))
+                      .filter(r => !searchQuery || (r.order_id?.toLowerCase() || '').includes(searchQuery.toLowerCase()) || (r.customer_vpa?.toLowerCase() || '').includes(searchQuery.toLowerCase()))
                       .map((row, idx) => (
                         <tr key={idx} className={row.category !== 'SETTLED' ? 'bg-[#faf4ec]' : 'hover:bg-[#faf4ec]/40'}>
                           <td className="py-2.5 px-3 font-bold text-[#141210]">{row.order_id}</td>
