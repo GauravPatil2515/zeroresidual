@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zeroresidual"
+version = "0.1.0"
+description = "The Open-Source UPI Settlement & Discrepancy Engine with Embedded Local Gemma 2 2B"
+authors = [{ name = "Gaurav Patil" }]
+license = { text = "Apache-2.0" }
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "click>=8.0.0",
+    "rich>=13.0.0",
+    "pydantic>=2.0.0",
+    "pandas>=2.0.0",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.23.0",
+    "requests>=2.31.0",
+    "pytest>=8.0.0",
+]
+
+[project.scripts]
+zeroresidual = "zeroresidual.cli:app"
