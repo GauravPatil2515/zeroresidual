@@ -44,7 +44,7 @@ class GemmaClient:
             self.model_name = "gemma2-9b-it"
         else:
             self.provider = "OPENROUTER"
-            self.model_name = "google/gemma-2-9b-it:free"
+            self.model_name = "google/gemma-3-4b-it"
 
     def is_available(self) -> bool:
         if self.provider in ("OPENROUTER", "GROQ") and self.api_key:
@@ -59,8 +59,8 @@ class GemmaClient:
         if not self.api_key:
             return None
         
-        # Try free model first, with fallback to standard
-        models_to_try = [self.model_name, "google/gemma-2-9b-it", "google/gemma-2-27b-it"]
+        # Use available OpenRouter Gemma models with automatic fallbacks
+        models_to_try = [self.model_name, "google/gemma-2-27b-it", "google/gemma-3-12b-it", "google/gemma-4-26b-a4b-it:free"]
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
