@@ -66,11 +66,15 @@ class NarrationClassifier:
             return DeductionCategory.SOUNDBOX_GST, None, "FALLBACK:REGEX"
         if "SNDBOX" in upper or "SOUNDBOX" in upper or "RENTAL" in upper:
             return DeductionCategory.SOUNDBOX_FEE, None, "FALLBACK:REGEX"
+        if "MDR" in upper or "INTERCHANGE" in upper:
+            return DeductionCategory.CARD_MDR_FEE, None, "FALLBACK:REGEX"
         if "CHBK" in upper or "DISPUTE" in upper or "ESCROW" in upper:
             return DeductionCategory.CHARGEBACK_HOLD, ref_id, "FALLBACK:REGEX"
+        if "CUTOFF" in upper or "T+1" in upper or "NIGHT-SETTLEMENT" in upper:
+            return DeductionCategory.CUTOFF_DELAY, ref_id, "FALLBACK:REGEX"
         if "REFUND" in upper or "REV-UPI" in upper:
             return DeductionCategory.REFUND, ref_id, "FALLBACK:REGEX"
-        if "SETTL" in upper or "NEFT" in upper:
+        if "SETTL" in upper or "NEFT" in upper or "CMS" in upper:
             return DeductionCategory.SETTLED, None, "FALLBACK:REGEX"
 
         return DeductionCategory.UNEXPLAINED, ref_id, "FALLBACK:UNEXPLAINED"

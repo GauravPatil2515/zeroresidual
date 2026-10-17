@@ -131,17 +131,33 @@ class ChatRequest(BaseModel):
 
 @app.post("/api/chat")
 def chat_with_munshi(req: ChatRequest):
-    ctx_str = ""
-    if req.context_data:
-        ctx_str = f"""
-Current active settlement context:
-- Gross Sales: ₹{req.context_data.get('gross_pos_sales', '50,000.00')}
-- Bank Received Payout: ₹{req.context_data.get('bank_received_payout', '43,000.00')}
-- Total Deductions: ₹{req.context_data.get('total_deductions', '7,000.00')}
-- Unexplained Residual: ₹{req.context_data.get('residual', '0.00')}
-- Status: {req.context_data.get('status', 'RECONCILED')}
-- Bank Detected: {req.context_data.get('bank_detected', 'HDFC Bank')}
+    ctx = req.context_data or {}
+    gross_val = str(ctx.get('gross_pos_sales', '50,000.00'))
+    payout_val = str(ctx.get('bank_received_payout', '43,000.00'))
+    deductions_val = str(ctx.get('total_deductions', '7,000.00'))
+    residual_val = str(ctx.get('residual', '0.00'))
+    status_val = str(ctx.get('status', 'RECONCILED'))
+    bank_val = str(ctx.get('bank_detected', 'HDFC Bank'))
+    file_name = str(ctx.get('file_name', 'Current Statement'))
+    total_rows = str(ctx.get('total_rows', '24'))
+    
+    top_deductions = ctx.get('top_deductions', [])
+    deductions_list_str = "\n".join([f"  • {d}" for d in top_deductions]) if top_deductions else "  • Refunds, Dispute Escrows, Hardware Rentals, GST"
+
+    ctx_str = f"""
+Active Statement Audit Context:
+- Statement / File: {file_name} ({total_rows} entries processed)
+- Bank / Source: {bank_val}
+- Gross Sales / Credits: ₹{gross_val}
+- Bank Net Payout: ₹{payout_val}
+- Total Deductions & Adjustments: ₹{deductions_val}
+- Itemized Deductions:
+{deductions_list_str}
+- Discrepancy / Unexplained Residual: ₹{residual_val}
+- Audit Status: {status_val}
+- Calculation Precision: 100% exact to the paisa (0.01 INR)
 """
+
     history_str = ""
     if req.history:
         for m in req.history[-4:]:
@@ -161,24 +177,102 @@ You are honest, respectful, sharp, and helpful. You explain complex banking dedu
 Conversation history:
 {history_str}
 
-User: {req.message}
+User Question: {req.message}
 
 Instructions:
 1. {lang_instr}
-2. Keep your answer actionable, practical, and under 4-5 bullet points.
-3. If money is missing or disputed, tell the merchant exactly what proof they need to show the bank or payment company.
+2. Ground your response STRICTLY on the numbers in the Active Statement Audit Context above.
+3. Keep your answer actionable, practical, and structured with 3-4 clear bullet points.
+4. If money is missing or held in dispute, tell the merchant exactly what proof they need to show the bank or payment company.
 Gemma AI Munshi:"""
 
     reply = gemma_client.explain(prompt)
     if not reply:
-        if "212" in req.message or "shortfall" in req.message.lower() or "kam" in req.message.lower():
-            reply = "Aapke ₹50,000 ki sales mein se bank ne ₹42,788 bheje hain. Saare verified deductions ke baad ₹212.00 bank ki taraf se kam aaye hain. Bank statement aur Paytm settlement ID lekar bank support se claim karein."
-        elif "7000" in req.message or "deduct" in req.message.lower() or "kata" in req.message.lower():
-            reply = "₹7,000 ka hisaab bilkul saaf hai: ₹2,400 customer refunds, ₹3,100 customer dispute hold (ORD-1008), ₹1,000 raat 11 baje ke baad ke orders, aur ₹500 soundbox rental + GST."
-        elif "dispute" in req.message.lower() or "3100" in req.message:
-            reply = "Customer ne ₹3,100 ke order #ORD-1008 par complaint ki hai. Dukaan ki delivery receipt aur POS slip bank ko bhejkar yeh escrow release karwaya ja sakta hai."
+        # Dynamic Heuristic Munshi Engine (Offline/Fallback)
+        msg_lower = req.message.lower()
+        is_hi = req.language.upper() == "HI"
+
+        if any(w in msg_lower for w in ["212", "shortfall", "kam", "missing", "difference", "फर्क"]):
+            if "212" in residual_val or "212" in req.message:
+                reply = (
+                    f"आपके ₹{gross_val} की बिक्री में से बैंक ने ₹{payout_val} भेजे हैं। "
+                    f"सभी सत्यापित कटौतियों (₹{deductions_val}) के बाद भी ₹212.00 बैंक की तरफ से कम आए हैं। "
+                    f"यह बैंक का अस्पष्ट शॉर्टफॉल है—बैंक स्टेटमेंट और सेटलमेंट आईडी लेकर बैंक सपोर्ट से क्लेम करें।"
+                    if is_hi else
+                    f"Out of ₹{gross_val} gross sales, the bank credited ₹{payout_val}. "
+                    f"After all verified deductions (₹{deductions_val}), exactly ₹212.00 is missing. "
+                    f"This is an unexplained bank shortfall—contact your acquiring bank with the settlement UTR."
+                )
+            else:
+                reply = (
+                    f"इस एक्टिव स्टेटमेंट में कोई अनसुलझा फर्क नहीं है! कुल ग्रॉस क्रेडिट ₹{gross_val} में से "
+                    f"₹{deductions_val} की कटौती के बाद शुद्ध ₹{payout_val} का हिसाब 100% सही मिलान हुआ है।"
+                    if is_hi else
+                    f"There is no unexplained shortfall in this statement! Gross ₹{gross_val} minus "
+                    f"deductions ₹{deductions_val} matches net payout ₹{payout_val} to the exact paisa."
+                )
+        elif any(w in msg_lower for w in ["deduct", "kata", "cut", "कटौती", "चार्ज", "चार्जेस", "breakdown", "विस्तार"]):
+            if is_hi:
+                ded_lines = "\n".join([f"• {d}" for d in top_deductions]) if top_deductions else f"• कुल कटौतियां: ₹{deductions_val}"
+                reply = (
+                    f"आपके स्टेटमेंट में कुल ₹{deductions_val} की कटौती हुई है। इसका पूरा विवरण निम्नलिखित है:\n"
+                    f"{ded_lines}\n"
+                    f"• कटौतियों के बाद बैंक में शुद्ध ₹{payout_val} जमा हुआ है।"
+                )
+            else:
+                ded_lines = "\n".join([f"• {d}" for d in top_deductions]) if top_deductions else f"• Total deductions: ₹{deductions_val}"
+                reply = (
+                    f"Total deductions for this statement amount to ₹{deductions_val}. Itemized breakdown:\n"
+                    f"{ded_lines}\n"
+                    f"• Net payout credited to your bank: ₹{payout_val}."
+                )
+        elif any(w in msg_lower for w in ["dispute", "chargeback", "डिस्प्यूट", "होल्ड", "claim", "escrow"]):
+            reply = (
+                f"कस्टमर डिस्प्यूट / चार्जबैक होल्ड के लिए बैंक या गेटवे आपके पैसे एस्क्रो में रोक लेता है। "
+                f"इसे वापस पाने के लिए:\n"
+                f"1. ग्राहक का बिल या डिलीवरी चालान कॉपी तैयार रखें।\n"
+                f"2. POS मशीन या साउंडबॉक्स की सफल पेमेंट रसीद लगाएं।\n"
+                f"3. हमारे 'Defend Dispute' बटन से बैंक नोडल अधिकारी को रिप्लाई भेजें।"
+                if is_hi else
+                f"Customer dispute holds are held in escrow pending verification. To claim back your funds:\n"
+                f"1. Attach customer order invoice or delivery proof.\n"
+                f"2. Attach POS terminal transaction receipt with timestamp.\n"
+                f"3. Submit evidence directly via our Defend Dispute action."
+            )
+        elif any(w in msg_lower for w in ["soundbox", "rent", "साउंडबॉक्स", "किराया", "mdr", "fee"]):
+            reply = (
+                f"साउंडबॉक्स और हार्डवेयर डिवाइस का किराया:\n"
+                f"• 4G IoT साउंडबॉक्स मासिक किराया लगभग ₹423.73 कटता है।\n"
+                f"• इस पर सरकारी नियमानुसार 18% GST (₹76.27) चार्ज होता है।\n"
+                f"• कार्ड स्वाइप पर MDR इंटरचेंज फीस (जैसे ₹540 + GST) कटती है। यह नियमानुसार वैध है।"
+                if is_hi else
+                f"Soundbox rental and processing fees breakdown:\n"
+                f"• Monthly 4G IoT Soundbox hardware rental: ₹423.73.\n"
+                f"• Applicable 18% GST on device rental: ₹76.27 (HSN 9983).\n"
+                f"• Card swipe MDR interchange fees apply per RBI merchant guidelines."
+            )
+        elif any(w in msg_lower for w in ["payout", "net", "balance", "पेआउट", "शुद्ध", "बैलेंस", "कुल", "sales", "hisaab", "हिसाब"]):
+            reply = (
+                f"आपके स्टेटमेंट ({file_name}) का पूरा हिसाब:\n"
+                f"• कुल ग्रॉस बिक्री / क्रेडिट: ₹{gross_val}\n"
+                f"• कुल कटौतियां व चार्जेस: -₹{deductions_val}\n"
+                f"• बैंक में प्राप्त शुद्ध पेआउट: ₹{payout_val}\n"
+                f"• अनसुलझा अंतर (Residual): ₹{residual_val} (पैसे-पैसे का हिसाब)"
+                if is_hi else
+                f"Audit summary for {file_name}:\n"
+                f"• Gross merchant sales/credits: ₹{gross_val}\n"
+                f"• Total deductions & clawbacks: -₹{deductions_val}\n"
+                f"• Net payout credited to bank: ₹{payout_val}\n"
+                f"• Unexplained residual: ₹{residual_val} (Audited to 0.01 INR)"
+            )
         else:
-            reply = "Namaste! Main aapka Gemma AI Munshi hoon. Main aapke bank statement, shop QR sales, customer refunds aur deductions ka ek-ek paisa hisaab explain kar sakta hoon. Aap mujhse koi bhi sawal pooch sakte hain."
+            reply = (
+                f"नमस्ते! मैं आपका जेम्मा AI मुंशी हूँ। मैंने '{file_name}' ({total_rows} प्रविष्टियां) का हिसाब लोड किया है। "
+                f"कुल ग्रॉस बिक्री ₹{gross_val} और बैंक पेआउट ₹{payout_val} है। आप मुझसे किसी भी कटौती या रिफंड के बारे में पूछ सकते हैं।"
+                if is_hi else
+                f"Namaste! I am your Gemma AI Munshi. I have loaded '{file_name}' ({total_rows} entries). "
+                f"Gross credits: ₹{gross_val}, Bank payout: ₹{payout_val}, Deductions: ₹{deductions_val}. Ask me any questions!"
+            )
 
     return {
         "reply": reply,

@@ -382,7 +382,13 @@ export default function App() {
             bank_received_payout: data.bank_received_payout,
             total_deductions: data.total_deductions,
             residual: data.residual,
-            status: data.status
+            status: data.status,
+            scenario_name: data.scenario_name,
+            file_name: syncedFromUploadNotice ? syncedFromUploadNotice.replace(/^[✓\s]+/, '') : (data.scenario_name || 'Active Settlement'),
+            total_rows: data.ledger_records?.length || 24,
+            top_deductions: data.waterfall
+              ?.filter(w => w.direction === 'SUBTRACT')
+              .map(w => `${w.label}: ₹${Number(w.amount).toLocaleString('en-IN')}`) || []
           } : null,
           language: language
         })
@@ -482,6 +488,17 @@ export default function App() {
       explanation_hinglish: `Uploaded file '${audit.file_name}' se saari entries successfully extract ho gayi hain. Gross Credits ₹${Number(grossCredits).toLocaleString('en-IN')}, Deductions ₹${Number(totalDebits).toLocaleString('en-IN')}, aur Net Settlement ₹${Number(netPayout).toLocaleString('en-IN')} barabar match ho gaya hai.`,
       dispute_payload: null
     });
+
+    // Notify Chatbot with immediate greeting about uploaded statement
+    const syncChatMsg = {
+      id: Date.now().toString(),
+      role: 'assistant' as const,
+      content: language === 'HI'
+        ? `मैंने आपके मल्टी-पेज स्टेटमेंट '${audit.file_name}' (${audit.total_rows_processed} एंट्रीज़) का पूरा हिसाब लोड कर लिया है। कुल ग्रॉस क्रेडिट्स ₹${Number(grossCredits).toLocaleString('en-IN')}, कटौतियां -₹${Number(totalDebits).toLocaleString('en-IN')} और शुद्ध बैंक पेआउट ₹${Number(netPayout).toLocaleString('en-IN')} है। आप मुझसे इस स्टेटमेंट के किसी भी चार्ज या पेआउट के बारे में पूछ सकते हैं!`
+        : `I have analyzed your multi-page statement '${audit.file_name}' (${audit.total_rows_processed} entries). Gross credits: ₹${Number(grossCredits).toLocaleString('en-IN')}, Deductions: -₹${Number(totalDebits).toLocaleString('en-IN')}, Net payout: ₹${Number(netPayout).toLocaleString('en-IN')}. Ask me anything about this statement!`,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    setChatMessages(prev => [...prev, syncChatMsg]);
 
     setSyncedFromUploadNotice(`✓ Live Dashboard updated with '${audit.file_name}' (${audit.total_rows_processed} entries)`);
     setCurrentTab('settlement');
@@ -1577,17 +1594,43 @@ export default function App() {
                 <span className="text-[10px] font-mono uppercase tracking-wider text-[#8b8472] font-bold mr-1">
                   {language === 'HI' ? 'त्वरित सवाल:' : 'Suggested:'}
                 </span>
-                {(language === 'HI' ? [
-                  '₹212 का फर्क क्यों है?',
-                  '₹7,000 की कटौती समझाइए',
-                  '₹3,100 डिस्प्यूट कैसे क्लेम करें?',
-                  'साउंडबॉक्स शुल्क सही कटा क्या?'
-                ] : [
-                  'Why is ₹212 missing?',
-                  'Explain ₹7,000 deductions',
-                  'How to dispute ₹3,100 chargeback?',
-                  'Is the soundbox fee correct?'
-                ]).map((chip, idx) => (
+                {(
+                  (!!syncedFromUploadNotice || data?.scenario_name?.startsWith('uploaded_') || Number(data?.total_deductions || 0) > 7000)
+                    ? (language === 'HI' ? [
+                        `कटे हुए ₹${Number(data?.total_deductions || 0).toLocaleString('en-IN')} का ब्रेकडाउन दें`,
+                        'इस मल्टी-पेज स्टेटमेंट का कुल शुद्ध पेआउट कितना है?',
+                        'डिस्प्यूट व होल्ड कैसे क्लेम करें?',
+                        'साउंडबॉक्स व MDR चार्जेस का हिसाब समझाएं'
+                      ] : [
+                        `Breakdown of ₹${Number(data?.total_deductions || 0).toLocaleString('en-IN')} deductions`,
+                        'What is the net payout for this statement?',
+                        'How to resolve dispute & hold amounts?',
+                        'Explain Soundbox & MDR interchange fees'
+                      ])
+                    : data?.scenario_name === 'scenario_2_unexplained'
+                    ? (language === 'HI' ? [
+                        '₹212 का फर्क क्यों है?',
+                        '₹7,000 की कटौती समझाइए',
+                        '₹3,100 डिस्प्यूट कैसे क्लेम करें?',
+                        'साउंडबॉक्स शुल्क सही कटा क्या?'
+                      ] : [
+                        'Why is ₹212 missing?',
+                        'Explain ₹7,000 deductions',
+                        'How to dispute ₹3,100 chargeback?',
+                        'Is the soundbox fee correct?'
+                      ])
+                    : (language === 'HI' ? [
+                        `आज का ₹${Number(data?.gross_pos_sales || 50000).toLocaleString('en-IN')} का पूरा हिसाब समझाएं`,
+                        '₹7,000 की कटौती का ब्रेकडाउन दें',
+                        '₹3,100 डिस्प्यूट कैसे क्लेम करें?',
+                        'T+1 कटऑफ डिले क्या होता है?'
+                      ] : [
+                        `Explain today's ₹${Number(data?.gross_pos_sales || 50000).toLocaleString('en-IN')} reconciliation`,
+                        'Breakdown of ₹7,000 deductions',
+                        'How to dispute ₹3,100 chargeback?',
+                        'What is T+1 cutoff delay?'
+                      ])
+                ).map((chip, idx) => (
                   <button
                     key={idx}
                     type="button"

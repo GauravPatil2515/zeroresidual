@@ -80,17 +80,37 @@ class UniversalStatementParser:
                 deposit = Decimal("0.00")
                 balance = None
 
-                # Determine Debit vs Credit based on keywords or column positioning
+                # Determine Debit vs Credit based on column position or keywords
                 upper_line = line.upper()
                 is_debit = any(k in upper_line for k in ["HOLD", "REFUND", "CHBK", "RENT", "FEE", "GST", "ADJ", "REV", "DR"])
-                if not is_debit and ("CMS/" in upper_line or "SETTL" in upper_line or "DEPOSIT" in upper_line or "CREDIT" in upper_line or "CR" in upper_line):
-                    deposit = dec_amounts[0]
-                    if len(dec_amounts) > 1:
-                        balance = dec_amounts[-1]
-                else:
-                    withdrawal = dec_amounts[0]
-                    if len(dec_amounts) > 1:
-                        balance = dec_amounts[-1]
+
+                if len(dec_amounts) >= 3:
+                    dr_candidate = dec_amounts[0]
+                    cr_candidate = dec_amounts[1]
+                    balance = dec_amounts[2]
+                    if cr_candidate > Decimal("0.00"):
+                        deposit = cr_candidate
+                        withdrawal = Decimal("0.00")
+                    elif dr_candidate > Decimal("0.00"):
+                        withdrawal = dr_candidate
+                        deposit = Decimal("0.00")
+                    else:
+                        if is_debit:
+                            withdrawal = dr_candidate
+                        else:
+                            deposit = cr_candidate
+                elif len(dec_amounts) == 2:
+                    if not is_debit and ("CMS/" in upper_line or "SETTL" in upper_line or "DEPOSIT" in upper_line or "CREDIT" in upper_line or "CR" in upper_line):
+                        deposit = dec_amounts[0]
+                        balance = dec_amounts[1]
+                    else:
+                        withdrawal = dec_amounts[0]
+                        balance = dec_amounts[1]
+                elif len(dec_amounts) == 1:
+                    if not is_debit and ("CMS/" in upper_line or "SETTL" in upper_line or "DEPOSIT" in upper_line or "CREDIT" in upper_line or "CR" in upper_line):
+                        deposit = dec_amounts[0]
+                    else:
+                        withdrawal = dec_amounts[0]
 
                 # Extract UTR / Reference
                 ref_utr = None
