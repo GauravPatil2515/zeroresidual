@@ -41,14 +41,28 @@ class DisputeActionRequest(BaseModel):
     evidence_note: str
     merchant_action: str = "DEFEND_DISPUTE"
 
+class LLMKeyRequest(BaseModel):
+    api_key: str
+
 @app.get("/api/health")
 def health():
     return {
         "status": "online",
         "service": "ZeroResidual Settlement Engine",
         "llm_connected": gemma_client.is_available(),
+        "provider": getattr(gemma_client, "provider", "OLLAMA"),
         "model": gemma_client.model_name,
         "precision": "Decimal (Paise)"
+    }
+
+@app.post("/api/set-llm-key")
+def set_llm_key(req: LLMKeyRequest):
+    gemma_client.set_api_key(req.api_key)
+    return {
+        "status": "success",
+        "provider": gemma_client.provider,
+        "model": gemma_client.model_name,
+        "is_available": gemma_client.is_available()
     }
 
 @app.get("/api/scenarios")

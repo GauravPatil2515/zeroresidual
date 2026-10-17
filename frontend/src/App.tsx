@@ -298,6 +298,35 @@ export default function App() {
     return localStorage.getItem('zeroresidual_server_url') || '';
   });
 
+  // LLM API Key State
+  const [llmApiKey, setLlmApiKey] = useState<string>('');
+  const [isSavingKey, setIsSavingKey] = useState<boolean>(false);
+  const [keySaveStatus, setKeySaveStatus] = useState<string | null>(null);
+
+  const handleSaveLlmKey = async () => {
+    if (!llmApiKey.trim()) return;
+    setIsSavingKey(true);
+    setKeySaveStatus(null);
+    try {
+      const res = await fetch(getApiUrl('/api/set-llm-key'), {
+        method: 'POST',
+        headers: getHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ api_key: llmApiKey.trim() })
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setKeySaveStatus(`✓ Connected to ${json.provider} (${json.model})`);
+        checkBackendHealth();
+      } else {
+        throw new Error('Failed to save API key');
+      }
+    } catch (err: any) {
+      setKeySaveStatus(`⚠️ Error: ${err.message}`);
+    } finally {
+      setIsSavingKey(false);
+    }
+  };
+
   const getApiUrl = (endpoint: string) => {
     const base = serverUrl.replace(/\/+$/, '');
     return base ? `${base}${endpoint}` : endpoint;
@@ -1333,6 +1362,50 @@ export default function App() {
                     <span className="text-[#8b8472]">{t.order_ref}: </span>
                     <span className="font-bold text-[#141210]">{playgroundResult.extracted_reference || 'N/A'}</span>
                   </div>
+                </div>
+              )}
+            </div>
+
+            {/* OpenRouter / Gemma Cloud API Key Configuration Card */}
+            <div className="bg-[#fffdf8] border border-[#e0d8c8] p-5 rounded-xl shadow-xs space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="font-serif font-bold text-base text-[#141210] flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-[#e8501f]" />
+                  <span>Gemma 2 Cloud API Connection (OpenRouter)</span>
+                </div>
+                <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${
+                  backendHealth?.online ? 'bg-[#dcfce7] text-[#166534]' : 'bg-[#faf4ec] text-[#8b8472]'
+                }`}>
+                  {backendHealth?.model ? `Model: ${backendHealth.model}` : 'Model: google/gemma-2-9b'}
+                </span>
+              </div>
+              <p className="text-xs text-[#8b8472]">
+                Paste your OpenRouter API key (<code className="font-mono">sk-or-v1-...</code>) or Groq key to enable instant cloud Gemma 2 reasoning:
+              </p>
+
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  value={llmApiKey}
+                  onChange={(e) => setLlmApiKey(e.target.value)}
+                  placeholder="Paste sk-or-v1-... here"
+                  className="flex-1 text-xs font-mono bg-[#faf4ec] border border-[#e0d8c8] px-3 py-2 rounded focus:outline-none focus:border-[#e8501f]"
+                />
+                <button
+                  type="button"
+                  onClick={handleSaveLlmKey}
+                  disabled={isSavingKey || !llmApiKey.trim()}
+                  className="bg-[#141210] hover:bg-[#2c2824] disabled:opacity-50 text-white text-xs font-mono px-4 py-2 rounded font-bold cursor-pointer transition-all shrink-0"
+                >
+                  {isSavingKey ? 'Connecting...' : 'Connect Gemma'}
+                </button>
+              </div>
+
+              {keySaveStatus && (
+                <div className={`p-2 rounded text-xs font-mono ${
+                  keySaveStatus.startsWith('✓') ? 'bg-[#eaf7ee] text-[#166534]' : 'bg-[#fef2f2] text-[#dc2626]'
+                }`}>
+                  {keySaveStatus}
                 </div>
               )}
             </div>
