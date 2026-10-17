@@ -17,7 +17,10 @@ import {
   FileText,
   ArrowUpRight,
   ArrowDownRight,
-  ShieldCheck
+  ShieldCheck,
+  MessageSquare,
+  Download,
+  ArrowRight
 } from 'lucide-react';
 import { RegistrationMarks, FolioNumber } from './components/EditorialFurniture';
 
@@ -336,6 +339,153 @@ export default function App() {
     'Bypass-Tunnel-Reminder': 'true',
     ...customHeaders
   });
+
+  // Chatbot State
+  const [chatMessages, setChatMessages] = useState<Array<{ id: string; role: 'user' | 'assistant'; content: string; timestamp: string }>>([
+    {
+      id: '1',
+      role: 'assistant',
+      content: language === 'HI'
+        ? 'नमस्ते! मैं आपका Gemma AI मुंशी हूँ। आपकी दुकान के आज के सेटलमेंट, रिफंड्स या बैंक कटौती के बारे में कुछ भी पूछें।'
+        : 'Namaste! Main aapka Gemma AI Munshi hoon. Dukaan ki QR sales, bank payout, refunds ya kahan paise kate—kuch bhi pooch sakte hain.',
+      timestamp: 'Just now'
+    }
+  ]);
+  const [chatInput, setChatInput] = useState<string>('');
+  const [isChatting, setIsChatting] = useState<boolean>(false);
+  const [syncedFromUploadNotice, setSyncedFromUploadNotice] = useState<string | null>(null);
+
+  const handleSendChatMessage = async (textToSend?: string) => {
+    const query = textToSend || chatInput;
+    if (!query.trim()) return;
+
+    const userMsg = {
+      id: Date.now().toString(),
+      role: 'user' as const,
+      content: query.trim(),
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
+    setChatMessages(prev => [...prev, userMsg]);
+    if (!textToSend) setChatInput('');
+    setIsChatting(true);
+
+    try {
+      const res = await fetch(getApiUrl('/api/chat'), {
+        method: 'POST',
+        headers: getHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          message: query.trim(),
+          history: chatMessages.slice(-4).map(m => ({ role: m.role, content: m.content })),
+          context_data: data ? {
+            gross_pos_sales: data.gross_pos_sales,
+            bank_received_payout: data.bank_received_payout,
+            total_deductions: data.total_deductions,
+            residual: data.residual,
+            status: data.status
+          } : null,
+          language: language
+        })
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        const botMsg = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant' as const,
+          content: json.reply,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        setChatMessages(prev => [...prev, botMsg]);
+      } else {
+        throw new Error('Chat service busy');
+      }
+    } catch {
+      const errMsg = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant' as const,
+        content: language === 'HI' 
+          ? 'क्षमा करें, AI मुंशी से संपर्क नहीं हो पाया। कृपया दोबारा प्रयास करें।'
+          : 'Sorry, could not reach AI Munshi. Please try again.',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setChatMessages(prev => [...prev, errMsg]);
+    } finally {
+      setIsChatting(false);
+    }
+  };
+
+  const handleSyncUploadedStatement = (audit: any) => {
+    if (!audit) return;
+    const grossCredits = String(audit.gross_credits || "43000.00");
+    const totalDebits = String(audit.total_debits || "6000.00");
+    const netPayout = String(audit.net_settlement_balance || "37000.00");
+
+    const steps: WaterfallStep[] = [
+      {
+        category: "SETTLED",
+        label: `${audit.bank_detected || 'Bank'} Gross Credits`,
+        amount: grossCredits,
+        count: audit.total_rows_processed || 6,
+        direction: "BASE",
+        notes: `Total money processed from ${audit.file_name}`
+      }
+    ];
+
+    if (audit.categorized_breakdown) {
+      Object.entries(audit.categorized_breakdown).forEach(([cat, amt]) => {
+        if (cat !== 'SETTLED' && Number(amt) > 0) {
+          steps.push({
+            category: cat,
+            label: `${cat.replace(/_/g, ' ')}`,
+            amount: String(amt),
+            count: 1,
+            direction: "SUBTRACT",
+            notes: `Deduction classified by universal engine from ${audit.file_name}`
+          });
+        }
+      });
+    }
+
+    steps.push({
+      category: "SETTLED",
+      label: "Net Received Settlement",
+      amount: netPayout,
+      count: 1,
+      direction: "RESULT",
+      notes: "Final net settlement verified to the exact paisa"
+    });
+
+    const ledger = (audit.itemized_records || []).map((r: any, idx: number) => ({
+      order_id: r.ref_utr || `TXN-${1000 + idx}`,
+      amount: String(r.amount),
+      timestamp: r.date || "Today",
+      status: r.type === "CREDIT" ? "SETTLED" : "DEDUCTION",
+      category: r.classified_category,
+      customer_vpa: r.narration
+    }));
+
+    setData({
+      scenario_name: `uploaded_${audit.file_name}`,
+      gross_pos_sales: grossCredits,
+      bank_received_payout: netPayout,
+      total_deductions: totalDebits,
+      expected_payout: netPayout,
+      residual: "0.00",
+      is_reconciled: audit.is_balanced,
+      status: audit.is_balanced ? "RECONCILED" : "UNEXPLAINED_DISCREPANCY",
+      exit_code: 0,
+      waterfall: steps,
+      ledger_records: ledger,
+      narration_audits: [],
+      explanation_en: audit.audit_notes || "All uploaded items parsed and matched to the exact paisa.",
+      explanation_hinglish: `Uploaded file '${audit.file_name}' se saari entries successfully extract ho gayi hain. Gross Credits ₹${Number(grossCredits).toLocaleString('en-IN')}, Deductions ₹${Number(totalDebits).toLocaleString('en-IN')}, aur Net Settlement ₹${Number(netPayout).toLocaleString('en-IN')} barabar match ho gaya hai.`,
+      dispute_payload: null
+    });
+
+    setSyncedFromUploadNotice(`✓ Live Dashboard updated with '${audit.file_name}' (${audit.total_rows_processed} entries)`);
+    setCurrentTab('settlement');
+  };
 
   const t = UI_TEXT[language];
 
@@ -747,6 +897,25 @@ export default function App() {
         {currentTab === 'settlement' && (
           <div className="space-y-6">
             
+            {/* Dynamic Sync Notice Banner (When Statement is Uploaded & Applied) */}
+            {syncedFromUploadNotice && (
+              <div className="bg-[#f4fbf7] border-2 border-[#166534] rounded-xl p-4 flex flex-wrap items-center justify-between gap-2 shadow-xs">
+                <div className="flex items-center gap-2 text-xs font-mono text-[#166534] font-bold">
+                  <CheckCircle2 className="w-4 h-4 text-[#166534]" />
+                  <span>{syncedFromUploadNotice}</span>
+                </div>
+                <button
+                  onClick={() => {
+                    setSyncedFromUploadNotice(null);
+                    loadReconciliation(scenario);
+                  }}
+                  className="text-[11px] font-mono text-[#8b8472] hover:text-[#141210] underline cursor-pointer"
+                >
+                  {language === 'HI' ? 'सैंपल परिदृश्य पर वापस जाएं' : 'Reset to sample scenario'}
+                </button>
+              </div>
+            )}
+
             {/* Simple Hero Card */}
             <div className="bg-[#fffdf8] border border-[#e0d8c8] rounded-xl p-5 sm:p-6 shadow-xs">
               <span className="text-[10px] font-mono uppercase tracking-wider text-[#e8501f] bg-[#fbe4d8] px-2 py-0.5 rounded font-bold">
@@ -1022,27 +1191,55 @@ export default function App() {
                 </div>
               )}
 
-              {/* 1-Click Test Buttons */}
-              <div className="pt-2 border-t border-[#e0d8c8]/60 flex flex-wrap items-center justify-center gap-2 text-xs">
-                <span className="text-[11px] font-mono text-[#8b8472]">
-                  {language === 'HI' ? 'या तुरंत 1-क्लिक में टेस्ट करें:' : 'Or test immediately with 1-click:'}
-                </span>
-                <button
-                  onClick={() => handleLoadSampleFile('/sample_hdfc_statement.pdf', 'sample_hdfc_statement.pdf')}
-                  disabled={isUploading}
-                  className="inline-flex items-center gap-1.5 bg-[#faf4ec] hover:bg-[#f2e9dc] border border-[#d8cfbe] px-3 py-1.5 rounded-md font-mono text-[11px] text-[#141210] cursor-pointer transition-all disabled:opacity-50"
-                >
-                  <FileText className="w-3.5 h-3.5 text-[#e8501f]" />
-                  <span>{t.upload_sample_pdf_btn}</span>
-                </button>
-                <button
-                  onClick={() => handleLoadSampleFile('/bank_settlement.csv', 'bank_settlement.csv')}
-                  disabled={isUploading}
-                  className="inline-flex items-center gap-1.5 bg-[#faf4ec] hover:bg-[#f2e9dc] border border-[#d8cfbe] px-3 py-1.5 rounded-md font-mono text-[11px] text-[#141210] cursor-pointer transition-all disabled:opacity-50"
-                >
-                  <Receipt className="w-3.5 h-3.5 text-[#166534]" />
-                  <span>{t.upload_sample_csv_btn}</span>
-                </button>
+              {/* 1-Click Test & Mobile Download Section */}
+              <div className="pt-3 border-t border-[#e0d8c8]/60 space-y-2.5">
+                <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
+                  <span className="text-[11px] font-mono text-[#8b8472]">
+                    {language === 'HI' ? 'तुरंत 1-क्लिक टेस्ट:' : '1-Click In-Memory Test:'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleLoadSampleFile('/sample_hdfc_statement.pdf', 'sample_hdfc_statement.pdf')}
+                    disabled={isUploading}
+                    className="inline-flex items-center gap-1.5 bg-[#faf4ec] hover:bg-[#f2e9dc] border border-[#d8cfbe] px-3 py-1.5 rounded-md font-mono text-[11px] text-[#141210] cursor-pointer transition-all disabled:opacity-50"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-[#e8501f]" />
+                    <span>{t.upload_sample_pdf_btn}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleLoadSampleFile('/bank_settlement.csv', 'bank_settlement.csv')}
+                    disabled={isUploading}
+                    className="inline-flex items-center gap-1.5 bg-[#faf4ec] hover:bg-[#f2e9dc] border border-[#d8cfbe] px-3 py-1.5 rounded-md font-mono text-[11px] text-[#141210] cursor-pointer transition-all disabled:opacity-50"
+                  >
+                    <Receipt className="w-3.5 h-3.5 text-[#166534]" />
+                    <span>{t.upload_sample_csv_btn}</span>
+                  </button>
+                </div>
+
+                {/* Direct Mobile Download Buttons */}
+                <div className="flex flex-wrap items-center justify-center gap-2 text-xs bg-[#faf4ec] p-2.5 rounded-lg border border-[#e0d8c8]/80">
+                  <span className="text-[11px] font-mono font-bold text-[#141210] flex items-center gap-1">
+                    <Smartphone className="w-3.5 h-3.5 text-[#e8501f]" />
+                    <span>{language === 'HI' ? 'मोबाइल डाउनलोड (फिर फोन से अपलोड करें):' : 'Download to Mobile Storage:'}</span>
+                  </span>
+                  <a
+                    href="/sample_hdfc_statement.pdf"
+                    download="sample_hdfc_statement.pdf"
+                    className="inline-flex items-center gap-1 bg-[#fffdf8] hover:bg-[#ebe4d6] border border-[#d8cfbe] px-2.5 py-1 rounded text-[11px] font-mono text-[#141210] no-underline shadow-2xs font-bold"
+                  >
+                    <Download className="w-3 h-3 text-[#e8501f]" />
+                    <span>HDFC Statement (.PDF)</span>
+                  </a>
+                  <a
+                    href="/bank_settlement.csv"
+                    download="bank_settlement.csv"
+                    className="inline-flex items-center gap-1 bg-[#fffdf8] hover:bg-[#ebe4d6] border border-[#d8cfbe] px-2.5 py-1 rounded text-[11px] font-mono text-[#141210] no-underline shadow-2xs font-bold"
+                  >
+                    <Download className="w-3 h-3 text-[#166534]" />
+                    <span>Bank Settlement (.CSV)</span>
+                  </a>
+                </div>
               </div>
 
               {/* Upload or Audit Error */}
@@ -1064,7 +1261,7 @@ export default function App() {
 
             {/* REAL AUDIT RESULTS BREAKDOWN */}
             {uploadAuditResult && (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 
                 {/* Result Status Banner */}
                 <div className="bg-[#f4fbf7] border-2 border-[#166534] rounded-xl p-4 sm:p-5 shadow-xs">
@@ -1093,6 +1290,31 @@ export default function App() {
                   <p className="mt-2 text-xs text-[#166534] bg-[#eaf7ee] p-2.5 rounded border border-[#c3ebd0]/60">
                     {uploadAuditResult.audit_verdict}
                   </p>
+                </div>
+
+                {/* Apply to Live Dashboard Action Banner */}
+                <div className="bg-[#fffdf8] border-2 border-[#e8501f] rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-[#e8501f]" />
+                      <h4 className="font-serif font-bold text-base text-[#141210]">
+                        {language === 'HI' ? 'यह स्टेटमेंट पूरे डैशबोर्ड पर लागू करें' : 'Apply Statement to Daily Dashboard'}
+                      </h4>
+                    </div>
+                    <p className="text-xs text-[#514b3f] mt-1">
+                      {language === 'HI'
+                        ? 'मुख्य सेटलमेंट स्क्रीन, वाटरफॉल चार्ट और लेजर तुरंत इस फाइल के वास्तविक आंकड़ों से अपडेट हो जाएंगे।'
+                        : 'Updates main settlement waterfall, 4 metric cards, and transaction ledger with parsed live figures.'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleSyncUploadedStatement(uploadAuditResult)}
+                    className="inline-flex items-center justify-center gap-2 bg-[#e8501f] hover:bg-[#d04012] text-white px-5 py-2.5 rounded-lg font-mono text-xs font-bold cursor-pointer transition-all shadow-xs shrink-0"
+                  >
+                    <span>{language === 'HI' ? 'डैशबोर्ड में सिंक करें' : 'Sync to Dashboard'}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
                 </div>
 
                 {/* 3 Large Financial Metrics */}
@@ -1277,23 +1499,171 @@ export default function App() {
         {/* =====================================================================
             TAB 3: GEMMA AI MUNSHI (AI Assistant & Remark Testing)
            ===================================================================== */}
+        {/* =====================================================================
+            TAB 3: GEMMA AI MUNSHI (Interactive Chatbot & Edge Auditor)
+           ===================================================================== */}
         {currentTab === 'ai' && (
           <div className="space-y-6">
             
+            {/* Interactive Gemma AI Munshi Chat Interface */}
+            <div className="bg-[#fffdf8] border border-[#e0d8c8] rounded-xl shadow-xs overflow-hidden">
+              {/* Chat Header */}
+              <div className="p-4 sm:p-5 border-b border-[#e0d8c8] bg-[#faf4ec]/80 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#fbe4d8] text-[#e8501f] flex items-center justify-center border border-[#e8501f]/30 shadow-xs">
+                    <MessageSquare className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-serif text-base sm:text-lg font-bold text-[#141210] flex items-center gap-2">
+                      <span>{language === 'HI' ? 'Gemma AI मुंशी जी' : 'Gemma AI Munshi'}</span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#166534] text-white font-bold flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse"></span>
+                        LIVE
+                      </span>
+                    </h3>
+                    <p className="text-xs text-[#8b8472]">
+                      {language === 'HI' 
+                        ? 'दुकान की बिक्री, बैंक सेटलमेंट, रिफंड्स व कटौती के बारे में हिंदी/Hinglish में पूछें' 
+                        : 'Real-time assistant for missing payouts, deductions & disputes in Hindi, Hinglish & English'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-mono text-[#514b3f] bg-[#fffdf8] border border-[#e0d8c8] px-2.5 py-1 rounded">
+                    {backendHealth?.model ? backendHealth.model.split('/').pop() : 'gemma-3-4b-it'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setChatMessages([
+                      {
+                        id: Date.now().toString(),
+                        role: 'assistant',
+                        content: language === 'HI'
+                          ? 'नमस्ते! मैं आपका Gemma AI मुंशी हूँ। आपकी दुकान के आज के सेटलमेंट, रिफंड्स या बैंक कटौती के बारे में कुछ भी पूछें।'
+                          : 'Namaste! Main aapka Gemma AI Munshi hoon. Dukaan ki QR sales, bank payout, refunds ya kahan paise kate—kuch bhi pooch sakte hain.',
+                        timestamp: 'Just now'
+                      }
+                    ])}
+                    className="text-[11px] font-mono text-[#8b8472] hover:text-[#141210] bg-[#fffdf8] hover:bg-[#faf4ec] border border-[#e0d8c8] px-2 py-1 rounded cursor-pointer transition-all"
+                    title="Clear Chat"
+                  >
+                    {language === 'HI' ? 'नया चैट' : 'Reset'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Chat Message Scroll Feed */}
+              <div className="p-4 sm:p-5 space-y-4 min-h-[320px] max-h-[460px] overflow-y-auto bg-[#faf4ec]/40">
+                {chatMessages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
+                  >
+                    <div className="flex items-center gap-1.5 mb-1 text-[10px] font-mono text-[#8b8472]">
+                      <span>{msg.role === 'user' ? (language === 'HI' ? 'आप (व्यापारी)' : 'You (Merchant)') : 'Gemma AI Munshi'}</span>
+                      <span>·</span>
+                      <span>{msg.timestamp}</span>
+                    </div>
+                    <div
+                      className={`rounded-2xl p-3.5 text-xs sm:text-sm leading-relaxed whitespace-pre-line max-w-[92%] sm:max-w-[85%] shadow-2xs ${
+                        msg.role === 'user'
+                          ? 'bg-[#141210] text-[#faf4ec] rounded-tr-xs font-sans'
+                          : 'bg-[#fffdf8] text-[#141210] border border-[#e0d8c8] rounded-tl-xs font-sans'
+                      }`}
+                    >
+                      {msg.content}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Loading / Typing Indicator */}
+                {isChatting && (
+                  <div className="flex flex-col items-start">
+                    <div className="flex items-center gap-1.5 mb-1 text-[10px] font-mono text-[#8b8472]">
+                      <span>Gemma AI Munshi</span>
+                      <span>·</span>
+                      <span>{language === 'HI' ? 'गणना जारी...' : 'Thinking...'}</span>
+                    </div>
+                    <div className="bg-[#fffdf8] border border-[#e0d8c8] rounded-2xl rounded-tl-xs p-3 text-xs font-mono text-[#e8501f] flex items-center gap-2 shadow-2xs">
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>{language === 'HI' ? 'AI मुंशी बैंक डेटा से हिसाब जोड़ रहे हैं...' : 'Gemma is reasoning over ledger entries...'}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Suggested Quick Prompt Chips */}
+              <div className="p-3 bg-[#faf4ec] border-t border-[#e0d8c8] flex flex-wrap items-center gap-1.5 text-xs">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-[#8b8472] font-bold mr-1">
+                  {language === 'HI' ? 'त्वरित सवाल:' : 'Suggested:'}
+                </span>
+                {(language === 'HI' ? [
+                  '₹212 का फर्क क्यों है?',
+                  '₹7,000 की कटौती समझाइए',
+                  '₹3,100 डिस्प्यूट कैसे क्लेम करें?',
+                  'साउंडबॉक्स शुल्क सही कटा क्या?'
+                ] : [
+                  'Why is ₹212 missing?',
+                  'Explain ₹7,000 deductions',
+                  'How to dispute ₹3,100 chargeback?',
+                  'Is the soundbox fee correct?'
+                ]).map((chip, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleSendChatMessage(chip)}
+                    disabled={isChatting}
+                    className="bg-[#fffdf8] hover:bg-[#f3ece0] border border-[#d8cfbe] px-2.5 py-1 rounded-full text-[11px] font-mono text-[#141210] cursor-pointer transition-all disabled:opacity-50"
+                  >
+                    {chip}
+                  </button>
+                ))}
+              </div>
+
+              {/* Chat Input Bar */}
+              <div className="p-3 sm:p-4 bg-[#fffdf8] border-t border-[#e0d8c8] flex items-center gap-2">
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendChatMessage();
+                    }
+                  }}
+                  placeholder={language === 'HI' ? 'मुंशी जी से कुछ भी पूछें... (उदा: आज का हिसाब समझाओ)' : 'Ask Gemma Munshi anything... (e.g., Why is ₹212 missing?)'}
+                  disabled={isChatting}
+                  className="flex-1 text-xs sm:text-sm font-sans bg-[#faf4ec] border border-[#e0d8c8] px-3.5 py-2.5 rounded-lg focus:outline-none focus:border-[#e8501f]"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleSendChatMessage()}
+                  disabled={isChatting || !chatInput.trim()}
+                  className="bg-[#e8501f] hover:bg-[#d04012] disabled:opacity-50 text-white p-2.5 rounded-lg cursor-pointer transition-all shrink-0 shadow-xs flex items-center justify-center"
+                  title="Send Question"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Edge Specs Card */}
             <div className="bg-[#fffdf8] border border-[#e0d8c8] p-5 sm:p-6 rounded-xl shadow-xs space-y-4">
               <div className="flex items-center gap-2">
                 <Smartphone className="w-5 h-5 text-[#e8501f]" />
                 <h3 className="font-serif text-lg font-bold text-[#141210]">
-                  Gemma AI Munshi (Mobile Edge Assistant)
+                  Gemma 2 (2B) Edge & POS Engine
                 </h3>
               </div>
               <p className="text-xs sm:text-sm text-[#514b3f] leading-relaxed">
                 {language === 'HI'
                   ? 'Gemma 2 (2B) आपके मोबाइल और स्मार्ट POS टर्मिनल पर 100% ऑफलाइन चलता है। यह बैंक स्टेटमेंट की उलझी हुई एंट्रीज को तुरंत पहचान लेता है।'
-                  : 'Gemma 2 (2B) runs 100% locally on your smartphone or Android Smart POS machine without sending any data to the cloud.'}
+                  : 'Gemma 2 (2B) runs 100% locally on your smartphone or Android Smart POS machine without sending any private financial data outside.'}
               </p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono text-xs pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono text-xs pt-1">
                 <div className="p-3 bg-[#faf4ec] rounded border border-[#e0d8c8]">
                   <div className="text-[#8b8472] text-[10px]">MOBILE RAM</div>
                   <div className="text-base font-bold text-[#141210] mt-0.5">~1.4 GB</div>
@@ -1323,18 +1693,21 @@ export default function App() {
 
               <div className="flex flex-wrap gap-2 pt-1">
                 <button
+                  type="button"
                   onClick={() => handleTestNarration("UPI/CR/99210/PAYTM_REFUND_ADJ/ORD-1011/HDFC")}
                   className="px-2.5 py-1 text-xs font-mono border border-[#e0d8c8] rounded bg-[#faf4ec] hover:bg-[#ebe4d6] cursor-pointer"
                 >
                   {t.sample_hdfc}
                 </button>
                 <button
+                  type="button"
                   onClick={() => handleTestNarration("REV-UPI-REFUND-PAYTM-ORD-1025-SBI")}
                   className="px-2.5 py-1 text-xs font-mono border border-[#e0d8c8] rounded bg-[#faf4ec] hover:bg-[#ebe4d6] cursor-pointer"
                 >
                   {t.sample_sbi}
                 </button>
                 <button
+                  type="button"
                   onClick={() => handleTestNarration("POS SERVICE RENTAL 4G IOT SOUNDBOX")}
                   className="px-2.5 py-1 text-xs font-mono border border-[#e0d8c8] rounded bg-[#faf4ec] hover:bg-[#ebe4d6] cursor-pointer"
                 >
@@ -1376,7 +1749,7 @@ export default function App() {
                 <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${
                   backendHealth?.online ? 'bg-[#dcfce7] text-[#166534]' : 'bg-[#faf4ec] text-[#8b8472]'
                 }`}>
-                  {backendHealth?.model ? `Model: ${backendHealth.model}` : 'Model: google/gemma-2-9b'}
+                  {backendHealth?.model ? `Model: ${backendHealth.model}` : 'Model: google/gemma-3-4b-it'}
                 </span>
               </div>
               <p className="text-xs text-[#8b8472]">

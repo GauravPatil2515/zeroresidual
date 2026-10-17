@@ -66,14 +66,15 @@ class GemmaClient:
                 body: Dict[str, Any] = {
                     "contents": [{"parts": [{"text": prompt}]}],
                     "generationConfig": {
-                        "temperature": 0.0 if format_json else 0.2,
-                        "maxOutputTokens": max(max_tokens, 800)
+                        "temperature": 0.0 if format_json else 0.3,
+                        "maxOutputTokens": max(max_tokens, 1500),
+                        "thinkingConfig": {"thinkingBudget": 0}
                     }
                 }
                 if format_json:
                     body["generationConfig"]["responseMimeType"] = "application/json"
 
-                res = requests.post(url, json=body, timeout=self.timeout_sec)
+                res = requests.post(url, json=body, timeout=15.0)
                 if res.status_code == 200:
                     data = res.json()
                     candidates = data.get("candidates", [])
@@ -211,5 +212,5 @@ class GemmaClient:
                     pass
             return None
 
-    def explain(self, prompt: str) -> Optional[str]:
-        return self._raw_generate(prompt, format_json=False, max_tokens=180)
+    def explain(self, prompt: str, max_tokens: int = 600) -> Optional[str]:
+        return self._raw_generate(prompt, format_json=False, max_tokens=max_tokens)

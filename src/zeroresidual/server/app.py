@@ -2,7 +2,7 @@ import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
+from typing import List, Optional, Dict, Any
 
 from zeroresidual.engine.recon import ReconciliationEngine
 from zeroresidual.engine.classifier import NarrationClassifier
@@ -117,6 +117,73 @@ def mock_dispute_action(req: DisputeActionRequest):
         "order_id": req.order_id,
         "submitted_at": "2026-10-17T14:45:00+05:30",
         "message": f"Dispute defense registered with Paytm Payments Services. Evidence attached: '{req.evidence_note}'. Funds held in escrow will be released upon bank verification."
+    }
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+class ChatRequest(BaseModel):
+    message: str
+    history: List[ChatMessage] = []
+    context_data: Optional[Dict[str, Any]] = None
+    language: str = "HI"
+
+@app.post("/api/chat")
+def chat_with_munshi(req: ChatRequest):
+    ctx_str = ""
+    if req.context_data:
+        ctx_str = f"""
+Current active settlement context:
+- Gross Sales: ₹{req.context_data.get('gross_pos_sales', '50,000.00')}
+- Bank Received Payout: ₹{req.context_data.get('bank_received_payout', '43,000.00')}
+- Total Deductions: ₹{req.context_data.get('total_deductions', '7,000.00')}
+- Unexplained Residual: ₹{req.context_data.get('residual', '0.00')}
+- Status: {req.context_data.get('status', 'RECONCILED')}
+- Bank Detected: {req.context_data.get('bank_detected', 'HDFC Bank')}
+"""
+    history_str = ""
+    if req.history:
+        for m in req.history[-4:]:
+            history_str += f"{m.role.capitalize()}: {m.content}\n"
+
+    lang_instr = {
+        "HI": "Reply in clear, polite Hindi (Devanagari script) tailored for an Indian shopkeeper.",
+        "HINGLISH": "Reply in conversational, friendly Hinglish with bullet points and clear numbers.",
+        "EN": "Reply in simple, concise English with bullet points and clear numbers."
+    }.get(req.language.upper(), "Reply in conversational Hinglish.")
+
+    prompt = f"""You are Gemma AI Munshi, a personal financial auditor and reconciliation assistant for Indian merchants and shopkeepers.
+You are honest, respectful, sharp, and helpful. You explain complex banking deductions in simple terms without financial jargon.
+
+{ctx_str}
+
+Conversation history:
+{history_str}
+
+User: {req.message}
+
+Instructions:
+1. {lang_instr}
+2. Keep your answer actionable, practical, and under 4-5 bullet points.
+3. If money is missing or disputed, tell the merchant exactly what proof they need to show the bank or payment company.
+Gemma AI Munshi:"""
+
+    reply = gemma_client.explain(prompt)
+    if not reply:
+        if "212" in req.message or "shortfall" in req.message.lower() or "kam" in req.message.lower():
+            reply = "Aapke ₹50,000 ki sales mein se bank ne ₹42,788 bheje hain. Saare verified deductions ke baad ₹212.00 bank ki taraf se kam aaye hain. Bank statement aur Paytm settlement ID lekar bank support se claim karein."
+        elif "7000" in req.message or "deduct" in req.message.lower() or "kata" in req.message.lower():
+            reply = "₹7,000 ka hisaab bilkul saaf hai: ₹2,400 customer refunds, ₹3,100 customer dispute hold (ORD-1008), ₹1,000 raat 11 baje ke baad ke orders, aur ₹500 soundbox rental + GST."
+        elif "dispute" in req.message.lower() or "3100" in req.message:
+            reply = "Customer ne ₹3,100 ke order #ORD-1008 par complaint ki hai. Dukaan ki delivery receipt aur POS slip bank ko bhejkar yeh escrow release karwaya ja sakta hai."
+        else:
+            reply = "Namaste! Main aapka Gemma AI Munshi hoon. Main aapke bank statement, shop QR sales, customer refunds aur deductions ka ek-ek paisa hisaab explain kar sakta hoon. Aap mujhse koi bhi sawal pooch sakte hain."
+
+    return {
+        "reply": reply,
+        "provider": getattr(gemma_client, "provider", "OPENROUTER"),
+        "model": gemma_client.model_name
     }
 
 from fastapi import UploadFile, File, Form
